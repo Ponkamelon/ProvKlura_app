@@ -14,6 +14,7 @@ import {
   deleteStudySetAction,
 } from "@/app/actions/studySets";
 import { SubmitButton } from "@/components/SubmitButton";
+import { ConfirmSubmitButton } from "@/components/ConfirmSubmitButton";
 import type { Tables } from "@/lib/database.types";
 
 // regenerateQuestionsAction (Försök igen) kör samma AI-anrop som kan ta
@@ -91,7 +92,10 @@ export default async function StudySetReviewPage({
 
   return (
     <div>
-      <div className="flex flex-wrap items-start justify-between gap-4">
+      <Link href="/admin/prov" className="text-sm text-navy/60 underline">
+        ← Pluggprojekt
+      </Link>
+      <div className="mt-2 flex flex-wrap items-start justify-between gap-4">
         <div>
           <p className="text-sm text-navy/50">
             {studySet.chapters?.subjects?.name} · {studySet.chapters?.title}
@@ -102,13 +106,14 @@ export default async function StudySetReviewPage({
           <WaveDivider className="mt-2 h-3 w-24" color="#FF6B4A" />
         </div>
         <form action={deleteStudySetAction.bind(null, params.studySetId)}>
-          <button
-            type="submit"
+          <ConfirmSubmitButton
+            message={`Är du säker på att du vill ta bort "${studySet.title}"?\n\nAlla frågor, tilldelningar och elevernas resultat försvinner. Det går inte att ångra.`}
+            pendingText="Tar bort..."
             className="text-xs text-navy/40 underline hover:text-coral"
             title="Tar bort pluggprojektet och alla dess frågor, tilldelningar och elevförsök permanent"
           >
             Ta bort pluggprojekt
-          </button>
+          </ConfirmSubmitButton>
         </form>
       </div>
 
@@ -118,6 +123,40 @@ export default async function StudySetReviewPage({
         <span>· {questions?.length ?? 0} frågor skapade</span>
         <span>· {publishedCount} publicerade</span>
       </div>
+
+      <section className="mt-6 notebook-card p-6">
+        <h2 className="font-display text-xl font-semibold text-navy">Tilldela</h2>
+        <p className="mt-1 text-sm text-navy/60">
+          Publicerade frågor blir synliga för elever du tilldelar.
+        </p>
+        {students?.length ? (
+          <form action={assignStudySetAction.bind(null, params.studySetId)} className="mt-4 space-y-2">
+            {students.map((s) => (
+              <label key={s.id} className="flex items-center gap-2 text-sm text-navy">
+                <input
+                  type="checkbox"
+                  name="studentIds"
+                  value={s.id}
+                  defaultChecked={assignedIds.has(s.id)}
+                  className="h-4 w-4 rounded border-sand-deep"
+                />
+                {s.display_name} (Åk {s.grade_level})
+              </label>
+            ))}
+            <button type="submit" className="btn-primary mt-2">
+              Spara tilldelning
+            </button>
+          </form>
+        ) : (
+          <p className="mt-3 text-sm text-navy/60">
+            Inga elever än.{" "}
+            <Link href="/admin/elever/ny" className="text-ocean underline">
+              Lägg till en
+            </Link>
+            .
+          </p>
+        )}
+      </section>
 
       {failedMaterial && (
         <div className="mt-4 rounded-xl border border-coral bg-coral/10 p-4">
@@ -271,39 +310,6 @@ export default async function StudySetReviewPage({
         })}
       </section>
 
-      <section className="mt-10 notebook-card p-6">
-        <h2 className="font-display text-xl font-semibold text-navy">Tilldela</h2>
-        <p className="mt-1 text-sm text-navy/60">
-          Publicerade frågor blir synliga för elever du tilldelar.
-        </p>
-        {students?.length ? (
-          <form action={assignStudySetAction.bind(null, params.studySetId)} className="mt-4 space-y-2">
-            {students.map((s) => (
-              <label key={s.id} className="flex items-center gap-2 text-sm text-navy">
-                <input
-                  type="checkbox"
-                  name="studentIds"
-                  value={s.id}
-                  defaultChecked={assignedIds.has(s.id)}
-                  className="h-4 w-4 rounded border-sand-deep"
-                />
-                {s.display_name} (Åk {s.grade_level})
-              </label>
-            ))}
-            <button type="submit" className="btn-primary mt-2">
-              Spara tilldelning
-            </button>
-          </form>
-        ) : (
-          <p className="mt-3 text-sm text-navy/60">
-            Inga elever än.{" "}
-            <Link href="/admin/elever/ny" className="text-ocean underline">
-              Lägg till en
-            </Link>
-            .
-          </p>
-        )}
-      </section>
     </div>
   );
 }
