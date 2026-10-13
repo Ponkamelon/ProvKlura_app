@@ -34,7 +34,11 @@ export default async function ElevDashboard() {
 
   // Nationella prov (is_official) har flyttat till sin egen sida,
   // /elev/nationella — visas bara som en genväg härifrån.
-  const studySets = (allStudySets ?? []).filter((s) => !s.is_official);
+  // Skrivövningar som föräldern gjort själv (inte officiella) visas också
+  // bara under Skrivklura, aldrig som quiz.
+  const studySets = (allStudySets ?? []).filter(
+    (s) => !s.is_official && s.set_type !== "skriv",
+  );
   // Skrivklura (set_type = 'skriv') är också officiellt innehåll men har
   // sin egen sida, /elev/skrivklura, och räknas inte som nationella prov.
   const hasNationella = (allStudySets ?? []).some(
