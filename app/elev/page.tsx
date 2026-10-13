@@ -115,6 +115,19 @@ export default async function ElevDashboard() {
         </Link>
       )}
 
+      <Link
+        href="/elev/ideverkstad"
+        className="skriv-card mt-4 flex items-center justify-between gap-3 p-4 transition-transform hover:-translate-y-0.5"
+      >
+        <div>
+          <p className="font-medium text-navy">Idéverkstad ✨</p>
+          <p className="text-sm text-navy/60">
+            Svara på några frågor och få idéer till din text
+          </p>
+        </div>
+        <span className="text-navy/40">→</span>
+      </Link>
+
       {!studySets.length ? (
         <p className="mt-6 text-navy/70">
           {hasNationella || hasSkrivklura
