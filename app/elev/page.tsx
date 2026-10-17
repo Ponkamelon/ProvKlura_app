@@ -2,6 +2,7 @@ import Link from "next/link";
 import { requireProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { Medal, medalForPercent } from "@/components/Medal";
+import { currentWeekStart } from "@/lib/nutid/week";
 
 export default async function ElevDashboard() {
   const profile = await requireProfile("student");
@@ -83,6 +84,15 @@ export default async function ElevDashboard() {
 
   const firstName = profile.display_name.split(" ")[0];
 
+  // Har eleven redan gjort klart något kryss den här veckan?
+  const { count: nutidDoneCount } = await supabase
+    .from("nutidskryss_attempts")
+    .select("id", { count: "exact", head: true })
+    .eq("student_id", profile.id)
+    .eq("week_start", currentWeekStart())
+    .not("completed_at", "is", null);
+  const nutidDone = (nutidDoneCount ?? 0) > 0;
+
   return (
     <div>
       <h1 className="font-display text-2xl font-semibold text-navy">
@@ -118,6 +128,21 @@ export default async function ElevDashboard() {
           <span className="text-navy/40">→</span>
         </Link>
       )}
+
+      <Link
+        href="/elev/nutid"
+        className="nutid-card mt-4 flex items-center justify-between gap-3 p-4 transition-transform hover:-translate-y-0.5"
+      >
+        <div>
+          <p className="font-medium text-navy">Veckans nutidskryss 📰</p>
+          <p className="text-sm text-navy/60">
+            {nutidDone
+              ? "Klart för veckan! Titta på din nutidskoll"
+              : "Ett litet kryss om vad som händer just nu"}
+          </p>
+        </div>
+        <span className="text-navy/40">→</span>
+      </Link>
 
       <Link
         href="/elev/ideverkstad"

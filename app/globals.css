@@ -139,6 +139,62 @@
     @apply block w-full resize-y rounded-xl border border-sand-deep bg-white px-4 py-3 text-lg leading-relaxed text-navy placeholder:text-navy/40 focus:border-ink focus:outline-none;
   }
 
+  /* ───── Nutidskrysset ─────
+     Egen färg (tidningsrött) och en diskret tidningskänsla: gråvitt
+     tidningspapper med svag rasterprick i bakgrunden, och kort med en
+     dubbel linje upptill som en tidningsrubrik. Sidorna sätter
+     data-nutid på sin yttersta div. */
+  body:has([data-nutid]) .min-h-screen.bg-sand {
+    background-color: #efece6;
+    background-image: radial-gradient(rgba(14, 17, 20, 0.06) 1px, transparent 1.2px);
+    background-size: 6px 6px;
+  }
+
+  .nutid-card {
+    @apply relative rounded-card bg-white/95 shadow-card;
+    border: 1px solid rgba(180, 35, 90, 0.22);
+    border-top: 6px solid theme("colors.press.DEFAULT");
+  }
+
+  .nutid-card::before {
+    content: "";
+    position: absolute;
+    top: 4px;
+    left: 1rem;
+    right: 1rem;
+    height: 1px;
+    background: rgba(180, 35, 90, 0.35);
+  }
+
+  .nutid-badge {
+    @apply inline-block whitespace-nowrap rounded-full bg-press-soft px-2 py-0.5 text-xs font-medium text-press-dark;
+  }
+
+  .nutid-chip {
+    @apply rounded-full border-2 border-press/40 bg-white px-4 py-2 text-sm font-semibold text-press-dark transition-colors hover:bg-press-soft;
+  }
+
+  .nutid-grid {
+    display: grid;
+    gap: 2px;
+  }
+
+  .nutid-cell {
+    @apply relative flex aspect-square items-center justify-center rounded-[3px] border border-navy/25 bg-white font-mono text-[clamp(0.7rem,3.6vw,1.15rem)] font-medium uppercase text-navy;
+  }
+
+  .nutid-cell-number {
+    @apply pointer-events-none absolute left-[2px] top-0 font-sans text-[8px] font-semibold leading-none text-navy/60 sm:text-[9px];
+  }
+
+  .nutid-cell.nutid-cell-solved {
+    @apply bg-seafoam;
+  }
+
+  .nutid-cell.nutid-cell-active {
+    @apply border-press bg-press-soft;
+  }
+
   .field-label {
     @apply mb-1 block text-sm font-medium text-navy/80;
   }

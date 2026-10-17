@@ -26,6 +26,15 @@ export default async function AdminDashboard() {
 
   const firstName = profile.display_name.split(" ")[0];
 
+  const { data: isEditor } = await supabase.rpc("is_content_editor");
+  const { count: nutidDrafts } =
+    isEditor === true
+      ? await supabase
+          .from("nutidskryss")
+          .select("id", { count: "exact", head: true })
+          .eq("status", "draft")
+      : { count: 0 };
+
   return (
     <div>
       <h1 className="font-display text-3xl font-semibold text-navy">
@@ -73,6 +82,18 @@ export default async function AdminDashboard() {
           <span className="btn-secondary">📚 Nationella prov</span>
           <span className="text-xs text-navy/50">Färdiga, dela direkt</span>
         </Link>
+
+        {isEditor === true && (
+          <Link
+            href="/admin/nutidskryss"
+            className="nutid-card flex flex-col items-center justify-center gap-2 p-6 text-center transition-transform hover:-translate-y-0.5"
+          >
+            <span className="font-semibold text-navy">📰 Nutidskrysset</span>
+            <span className="text-xs text-navy/60">
+              {nutidDrafts ? `${nutidDrafts} utkast väntar på granskning` : "Inga utkast att granska"}
+            </span>
+          </Link>
+        )}
       </div>
     </div>
   );

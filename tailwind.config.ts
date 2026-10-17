@@ -31,6 +31,11 @@ const config: Config = {
           dark: "#43377A",
           soft: "#EEEAF8",
         },
+        press: {
+          DEFAULT: "#B4235A", // Nutidskrysset — tidningsrött/hallon
+          dark: "#8C1A45",
+          soft: "#FBEAF0",
+        },
       },
       fontFamily: {
         display: ["var(--font-display)", "sans-serif"],

@@ -2,6 +2,8 @@ import Link from "next/link";
 import { WaveDivider } from "@/components/WaveDivider";
 import { requireProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { NutidProgressView } from "@/components/NutidProgressView";
+import { computeProgress, type AttemptRow } from "@/lib/nutid/progress";
 
 export default async function StudentDetailPage({
   params,
@@ -52,6 +54,13 @@ export default async function StudentDetailPage({
     learning: progress?.filter((p) => p.mastery_level === "learning").length ?? 0,
     needs_practice: progress?.filter((p) => p.mastery_level === "needs_practice").length ?? 0,
   };
+
+  const { data: nutidAttempts } = await supabase
+    .from("nutidskryss_attempts")
+    .select("week_start, solved, solved_count, total, completed_at")
+    .eq("student_id", student.id);
+  const nutidProgress = computeProgress((nutidAttempts ?? []) as AttemptRow[]);
+  const nutidActiveWeeks = nutidProgress.weeks.filter((w) => w.status !== "tom").length;
 
   const completedAttempts = attempts?.filter((a) => a.completed_at) ?? [];
   const avgScore = completedAttempts.length
@@ -104,6 +113,19 @@ export default async function StudentDetailPage({
           </p>
         </div>
       </div>
+
+      <section className="nutid-card mt-10 p-5">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 className="font-display text-xl font-semibold text-navy">Nutidskrysset</h2>
+          <p className="text-sm text-navy/60">
+            Med {nutidActiveWeeks} av de senaste 8 veckorna · {nutidProgress.totalWords} ord totalt ·
+            nivå {nutidProgress.level.name}
+          </p>
+        </div>
+        <div className="mt-4 max-w-md">
+          <NutidProgressView progress={nutidProgress} compact />
+        </div>
+      </section>
 
       <section className="mt-10">
         <h2 className="font-display text-xl font-semibold text-navy">Historik</h2>

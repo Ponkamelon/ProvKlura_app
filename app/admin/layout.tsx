@@ -3,6 +3,7 @@ import { OwlMark } from "@/components/OwlMark";
 import { HouseIcon } from "@/components/HouseIcon";
 import { requireProfile } from "@/lib/auth";
 import { signOutAction } from "@/app/actions/auth";
+import { createClient } from "@/lib/supabase/server";
 
 export default async function AdminLayout({
   children,
@@ -10,6 +11,17 @@ export default async function AdminLayout({
   children: React.ReactNode;
 }) {
   const profile = await requireProfile("admin");
+  const supabase = createClient();
+
+  // Redaktörer (de som granskar Nutidskrysset) får en egen länk med antal utkast.
+  const { data: isEditor } = await supabase.rpc("is_content_editor");
+  const { count: nutidDrafts } =
+    isEditor === true
+      ? await supabase
+          .from("nutidskryss")
+          .select("id", { count: "exact", head: true })
+          .eq("status", "draft")
+      : { count: 0 };
 
   return (
     <div className="min-h-screen bg-sand">
@@ -40,6 +52,16 @@ export default async function AdminLayout({
               <Link href="/admin/testbibliotek" className="hover:text-ocean">
                 Testbibliotek
               </Link>
+              {isEditor === true && (
+                <Link href="/admin/nutidskryss" className="hover:text-ocean">
+                  Nutidskryss
+                  {nutidDrafts ? (
+                    <span className="ml-1 rounded-full bg-press px-1.5 py-0.5 text-[10px] font-semibold text-white">
+                      {nutidDrafts}
+                    </span>
+                  ) : null}
+                </Link>
+              )}
             </nav>
           </div>
           <div className="flex shrink-0 items-center gap-2 text-sm sm:gap-4">
