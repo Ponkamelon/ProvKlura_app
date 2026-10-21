@@ -107,7 +107,7 @@ export default async function ElevDashboard() {
     .not("completed_at", "is", null);
   const nutidDone = (nutidDoneCount ?? 0) > 0;
 
-  // Svit, antal klara test och pluggtid. Går det inte att hämta visas nollor
+  // Svit (dagar med minst ett klart test), antal klara test och pluggtid. Går det inte att hämta visas nollor
   // hellre än att sidan kraschar.
   const { data: overviewRaw, error: overviewError } = await supabase.rpc("my_study_overview");
   if (overviewError) console.error("Kunde inte hämta elevöversikt:", overviewError);

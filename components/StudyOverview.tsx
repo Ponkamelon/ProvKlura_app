@@ -3,7 +3,8 @@ import { computeStreak, formatStudyTime, weekStrip } from "@/lib/overview/streak
 
 /**
  * Elevens översikt på startsidan: svit (dagar i rad), antal klara test och
- * tid. Allt formulerat uppmuntrande — en bruten svit visas aldrig som ett
+ * tid. En dag räknas i sviten när eleven gjort klart minst ett test — antal
+ * rätt spelar ingen roll. Allt formulerat uppmuntrande — en bruten svit visas aldrig som ett
  * misslyckande, bara som en chans att starta en ny.
  */
 export function StudyOverview({ data, today }: { data: OverviewData; today: string }) {
@@ -15,13 +16,13 @@ export function StudyOverview({ data, today }: { data: OverviewData; today: stri
   if (streak.activeToday && streak.current >= 2) {
     message = `${streak.current} dagar i rad – snyggt jobbat!`;
   } else if (streak.activeToday) {
-    message = "Bra jobbat idag! Plugga en stund imorgon också, så har du en svit.";
+    message = "Bra jobbat idag! Gör klart ett test imorgon också, så har du en svit.";
   } else if (streak.current > 0) {
-    message = `Plugga en liten stund idag så blir det ${streak.current + 1} dagar i rad.`;
+    message = `Gör klart ett test idag så blir det ${streak.current + 1} dagar i rad.`;
   } else if (data.tests === 0) {
     message = "Gör ditt första test – det tar bara några minuter.";
   } else {
-    message = "Ett kort test idag startar en ny svit.";
+    message = "Gör klart ett test idag så startar du en ny svit.";
   }
 
   return (
@@ -65,7 +66,7 @@ export function StudyOverview({ data, today }: { data: OverviewData; today: stri
               {d.isToday ? "idag" : d.label}
             </span>
             <span className="sr-only">
-              {d.isToday ? "Idag" : d.date}: {d.active ? "pluggat" : "inte pluggat"}
+              {d.isToday ? "Idag" : d.date}: {d.active ? "test klart" : "inget test klart"}
             </span>
           </li>
         ))}
