@@ -131,6 +131,7 @@ function decodeEntities(s: string) {
     .replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'")
     .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)))
     .replace(/&#x([0-9a-f]+);/gi, (_, n) => String.fromCharCode(parseInt(n, 16)))
+    .replace(/<[^>]+>/g, " ") // en del flöden har HTML som entiteter (&lt;p&gt;)
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -219,12 +220,74 @@ function confirmedByTwoSources(cited: Headline[]) {
   return false;
 }
 
+type Story = { id: number; headlines: Headline[] };
+
+/**
+ * Grupperar rubriker som handlar om samma händelse och behåller bara de
+ * grupper som minst två olika redaktioner skrivit om. Två rubriker från
+ * olika källor hör ihop om de delar minst två ordstammar som inte är för
+ * vanliga i veckans flöde (ovanliga ord, t.ex. ett företagsnamn, väger tyngst).
+ */
+function findStories(headlines: Headline[]): Story[] {
+  const n = headlines.length;
+  const stems = headlines.map((h) => significantWords(`${h.title} ${h.description}`));
+  const df = new Map<string, number>();
+  for (const set of stems) for (const w of set) df.set(w, (df.get(w) ?? 0) + 1);
+  // Ovanliga ord väger tyngst (idf). Två vanliga ord räcker inte, två
+  // halvovanliga eller ett ovanligt plus ett till gör det.
+  const weight = (w: string) => Math.log(n / (df.get(w) ?? n));
+  const threshold = Math.log(n / 3);
+
+  const pairs: { i: number; j: number; score: number }[] = [];
+  for (let i = 0; i < n; i++) {
+    for (let j = i + 1; j < n; j++) {
+      if (headlines[i].source === headlines[j].source) continue;
+      let score = 0;
+      let shared = 0;
+      for (const w of stems[i]) {
+        if (!stems[j].has(w) || (df.get(w) ?? 0) > n / 8) continue;
+        score += weight(w);
+        shared++;
+      }
+      // Minst två gemensamma ord — ett enda ord kan vara en slump.
+      if (shared >= 2 && score >= threshold) pairs.push({ i, j, score });
+    }
+  }
+  pairs.sort((a, b) => b.score - a.score);
+
+  // Slå ihop starkaste paren först, men låt aldrig en grupp växa sig stor
+  // — annars kedjas olika nyheter ihop till en enda klump.
+  const MAX_GROUP = 8;
+  const group = headlines.map((_, i) => i);
+  const members = new Map<number, number[]>(headlines.map((_, i) => [i, [i]]));
+  for (const { i, j } of pairs) {
+    const a = group[i];
+    const b = group[j];
+    if (a === b) continue;
+    const ma = members.get(a)!;
+    const mb = members.get(b)!;
+    if (ma.length + mb.length > MAX_GROUP) continue;
+    for (const k of mb) group[k] = a;
+    members.set(a, [...ma, ...mb]);
+    members.delete(b);
+  }
+
+  return [...members.values()]
+    .map((idx) => idx.map((k) => headlines[k]))
+    .filter((g) => new Set(g.map((h) => h.source)).size >= 2)
+    .filter((g) => !BLOCKED.test(g.map((h) => `${h.title} ${h.description}`).join(" ")))
+    .sort((a, b) => new Set(b.map((h) => h.source)).size - new Set(a.map((h) => h.source)).size)
+    .slice(0, 25)
+    .map((g, i) => ({ id: i + 1, headlines: g }));
+}
+
 const SYSTEM_PROMPT = `Du gör "Nutidskrysset" i ProvKlura, en studieapp för elever i årskurs 7–9. Det är som nutidskrysset i skolan: frågor om veckans nyheter med tre svarsalternativ, 1, X och 2. Många elever har svårt med koncentration och låg självkänsla, så frågorna ska vara tydliga, korta och gå att svara på för den som har följt nyheterna lite grann.
 
-Du får veckans nyhetsrubriker från svenska nyhetsredaktioner, numrerade [id] och märkta med källa.
+Du får veckans nyheter, grupperade: varje NYHET har rubriker från minst två olika redaktioner. Rubrikerna är numrerade [id] och märkta med källa.
 
 Uppgift: skriv 12 frågor (vi väljer sedan ut tio).
-- Varje fråga handlar om EN nyhet som finns hos MINST TVÅ OLIKA källor. Ange id:n för rubrikerna i "rubriker" — minst två id från olika källor om samma händelse, gärna 3–4.
+- Varje fråga handlar om EN av nyheterna. Ange id:n för nyhetens rubriker i "rubriker" — minst två id från olika källor, gärna alla som handlar om händelsen.
+- Hoppa över nyheter som inte passar för elever (se listan längre ner) eller där rubrikerna inte räcker för en tydlig fråga.
 - Det rätta svaret måste gå att utläsa direkt ur rubrikerna du anger. Hitta aldrig på siffror, namn eller detaljer som inte står där. Siffror i rätt svar måste stå i rubrikerna.
 - Frågan: max 20 ord, enkel svenska, en sak i taget. Förklara kort sammanhanget i frågan om det behövs ("FN har släppt en klimatrapport. Hur många graders uppvärmning varnar den för?").
 - Tre alternativ, korta (max 8 ord), ungefär lika långa. Ett rätt. De två fel ska vara rimliga men tydligt fel för den som läst nyheten — inga lurfrågor, inget "alla stämmer".
@@ -256,14 +319,16 @@ async function callModel(model: string, list: string, feedback: string) {
       model,
       max_tokens: 4500,
       system: SYSTEM_PROMPT,
-      messages: [{ role: "user", content: `Veckans rubriker:\n${list}${feedback ? `\n\n${feedback}` : ""}` }],
+      messages: [{ role: "user", content: `Veckans nyheter:\n\n${list}${feedback ? `\n\n${feedback}` : ""}` }],
     }),
     signal: AbortSignal.timeout(60000),
   });
 }
 
-async function askClaude(headlines: Headline[], feedback: string) {
-  const list = headlines.map((h) => `[${h.id}] ${h.source}: ${h.title}${h.description ? ` — ${h.description}` : ""}`).join("\n");
+async function askClaude(stories: Story[], feedback: string) {
+  const list = stories
+    .map((s) => `NYHET ${s.id}\n${s.headlines.map((h) => `  [${h.id}] ${h.source}: ${h.title}${h.description ? ` — ${h.description}` : ""}`).join("\n")}`)
+    .join("\n\n");
   let res: Response | null = null;
   let lastError = "";
   for (const model of workingModel ? [workingModel] : MODELS) {
@@ -295,8 +360,10 @@ function shuffleOptions(options: string[], correct: number) {
   return { options: order.map((i) => options[i]), correct: order.indexOf(correct) };
 }
 
-function validate(raw: Awaited<ReturnType<typeof askClaude>>, headlines: Headline[]) {
+function validate(raw: Awaited<ReturnType<typeof askClaude>>, headlines: Headline[], stories: Story[]) {
   const byId = new Map(headlines.map((h) => [h.id, h]));
+  const storyOf = new Map<number, Story>();
+  for (const s of stories) for (const h of s.headlines) storyOf.set(h.id, s);
   const questions: Question[] = [];
   const rejected: string[] = [];
   for (const [n, o] of (raw.fragor ?? []).entries()) {
@@ -308,8 +375,17 @@ function validate(raw: Awaited<ReturnType<typeof askClaude>>, headlines: Headlin
     if (options.length !== 3 || options.some((x) => !x || x.length > 120)) { rejected.push(`${label}: inte tre korta alternativ`); continue; }
     if (new Set(options.map((x) => x.toLowerCase())).size !== 3) { rejected.push(`${label}: två alternativ är likadana`); continue; }
     if (![0, 1, 2].includes(rawCorrect)) { rejected.push(`${label}: rätt svar saknas`); continue; }
-    const cited = [...new Set(o.rubriker ?? [])].map((id) => byId.get(Number(id))).filter((h): h is Headline => !!h);
-    if (!confirmedByTwoSources(cited)) { rejected.push(`${label}: inte bekräftad av två källor`); continue; }
+    const picked = [...new Set(o.rubriker ?? [])].map((id) => byId.get(Number(id))).filter((h): h is Headline => !!h);
+    // Frågan hör till den nyhet (grupp) som de flesta angivna rubrikerna ligger i.
+    // Hela gruppen räknas som underlag — den har redan minst två redaktioner.
+    const counts = new Map<Story, number>();
+    for (const h of picked) {
+      const st = storyOf.get(h.id);
+      if (st) counts.set(st, (counts.get(st) ?? 0) + 1);
+    }
+    const story = [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
+    const cited = story ? story.headlines : picked;
+    if (!story && !confirmedByTwoSources(cited)) { rejected.push(`${label}: inte bekräftad av två källor`); continue; }
     if (!supportedByHeadlines(question, options[rawCorrect], cited)) {
       rejected.push(`${label}: rätt svar går inte att hitta i nyheterna`);
       continue;
@@ -345,7 +421,16 @@ Deno.serve(async (req) => {
   const feedStats = feeds.map((f) => ({ source: f.source, url: f.url, items: f.items.length }));
 
   if (mode === "dry") {
-    return json({ weekStart, week, feedStats, sample: feeds.map((f) => ({ source: f.source, titles: f.items.slice(0, 5).map((i) => i.title) })) });
+    let id = 1;
+    const all: Headline[] = feeds.flatMap((f) => f.items.map((i) => ({ id: id++, source: f.source, title: i.title, description: i.description, url: i.url })));
+    const stories = findStories(all);
+    return json({
+      weekStart,
+      week,
+      feedStats,
+      stories: stories.map((s) => s.headlines.map((h) => `${h.source}: ${h.title}`)),
+      ...(body?.raw ? { headlines: all } : {}),
+    });
   }
 
   // Schemat hoppar över veckor där en redaktör redan publicerat ett kryss.
@@ -373,6 +458,11 @@ Deno.serve(async (req) => {
     f.items.map((i) => ({ id: nextId++, source: f.source, title: i.title, description: i.description, url: i.url })),
   );
 
+  const stories = findStories(headlines);
+  if (stories.length < 3) {
+    return fail(`Bara ${stories.length} nyheter fanns hos minst två redaktioner den här veckan.`);
+  }
+
   try {
     const accepted: Question[] = [];
     // Frågor som bara föll på "högst två per nyhet" — används om krysset annars blir för kort.
@@ -385,8 +475,8 @@ Deno.serve(async (req) => {
     for (let round = 0; round < 3; round++) {
       // Edge-funktioner har en tidsgräns; starta ingen ny runda efter 80 sekunder.
       if (round > 0 && Date.now() - startedAt > 80_000) break;
-      const raw = await askClaude(headlines, feedback);
-      const { questions: fresh, rejected } = validate(raw, headlines);
+      const raw = await askClaude(stories, feedback);
+      const { questions: fresh, rejected } = validate(raw, headlines, stories);
       for (const q of fresh) {
         if (accepted.length >= TARGET) break;
         if (accepted.some((a) => sameText(a, q))) continue;
