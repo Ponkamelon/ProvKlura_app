@@ -19,7 +19,10 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
 const ANTHROPIC_WORKSPACE_ID = Deno.env.get("ANTHROPIC_WORKSPACE_ID");
-const MODEL = "claude-haiku-4-5-20251001";
+// Urvalet kräver omdöme (vilken nyhet hör ihop med vilket begrepp), så en
+// starkare modell provas först. Saknar nyckeln åtkomst faller vi tillbaka
+// på Haiku, som resten av appen använder. Körs bara en gång i veckan.
+const MODELS = ["claude-sonnet-4-5", "claude-haiku-4-5-20251001"];
 
 type Source = { name: string; urls: string[] };
 
@@ -166,10 +169,25 @@ async function fetchSource(source: Source) {
   return { source: source.name, url: null as string | null, items: [] as { title: string; description: string; url: string }[] };
 }
 
+/** Ordstammar (första 5 bokstäverna) så att "räntan" och "räntor" räknas som samma ord. */
 function significantWords(text: string) {
   return new Set(
-    text.toLowerCase().split(/[^a-zåäöé]+/).filter((w) => w.length >= 5 && !STOPWORDS.has(w)),
+    text
+      .toLowerCase()
+      .split(/[^a-zåäöéü]+/)
+      .filter((w) => w.length >= 5 && !STOPWORDS.has(w))
+      .map((w) => w.slice(0, 5)),
   );
+}
+
+/** Står svaret (eller dess stam) i någon av rubrikerna? Annars är kopplingen påhittad. */
+function answerAppearsInHeadlines(answer: string, concept: string, cited: Headline[]) {
+  const text = cited.map((h) => `${h.title} ${h.description}`).join(" ").toLowerCase();
+  const stems = [answer, ...concept.split(/\s+/)]
+    .map((w) => w.toLowerCase().replace(/[^a-zåäöéü]/g, ""))
+    .filter((w) => w.length >= 2)
+    .map((w) => (w.length > 6 ? w.slice(0, Math.max(5, w.length - 3)) : w.slice(0, Math.max(3, w.length - 1))));
+  return stems.some((stem) => text.includes(stem));
 }
 
 /** Minst två olika källor, och rubrikerna från olika källor måste dela ett ord — så AI:n inte parar ihop olika nyheter. */
@@ -192,23 +210,26 @@ const SYSTEM_PROMPT = `Du gör "Veckans nutidskryss" i ProvKlura, en studieapp f
 
 Du får veckans nyhetsrubriker från svenska nyhetsredaktioner, numrerade [id] och märkta med källa.
 
-Uppgift: välj ut 8 ord till ett korsord.
-- Svaret ska vara ETT ord, 3–12 bokstäver, bara bokstäver (å, ä, ö går bra). Helst ett skolbegrepp ur listan nedan (t.ex. INFLATION, RIKSDAG, KOLDIOXID). Landsnamn, personnamn och partinamn är INTE tillåtna som svar.
-- Ledtråden kopplar begreppet till en nyhet från veckan, skriven med egna ord på enkel svenska. Max 18 ord. Den får inte innehålla svaret eller en böjning av det.
-- Varje ord ska bygga på en nyhet som finns hos MINST TVÅ OLIKA källor. Ange id:n för rubrikerna i "rubriker" — minst två id från olika källor som handlar om samma händelse.
+Uppgift: föreslå 12 ord till ett korsord (vi väljer sedan ut de som passar ihop).
+- Utgå från NYHETERNA, inte från begreppslistan: hitta en nyhet som flera källor skriver om, och välj ett ord som faktiskt står i rubrikerna och som är ett begrepp eleven kan ha nytta av i skolan (t.ex. "klimatmål" → KLIMAT, "räntan sänks" → RÄNTA, "elpriset" → ELPRIS). Ordet (eller dess stam) MÅSTE stå i minst en av rubrikerna du anger — annars underkänns det.
+- Hitta aldrig på en koppling. Passar inget skolbegrepp naturligt till en nyhet: hoppa över den nyheten.
+- Svaret ska vara ETT ord, 3–12 bokstäver, med korrekt svensk stavning inklusive å, ä, ö. Landsnamn, personnamn och partinamn är INTE tillåtna som svar.
+- Ledtråden kopplar begreppet till en nyhet från veckan, skriven med egna ord på enkel svenska. Max 18 ord. Den får INTE innehålla svaret, inte en böjning av det och inte ett sammansatt ord med svaret i (är svaret RÄNTA får ledtråden inte innehålla "räntan" eller "styrräntan").
+- Varje ord ska bygga på en nyhet som finns hos MINST TVÅ OLIKA källor. Ange id:n för rubrikerna i "rubriker" — minst två id från olika källor som handlar om SAMMA händelse. Ta med alla rubriker du hittar om händelsen, gärna 3–4.
 - "amne": skolämnet begreppet hör till (Samhällskunskap, Geografi, Historia, Biologi, Fysik, Kemi, Teknik).
 - Välj gärna ord som delar bokstäver med varandra, så de går att korsa.
 
-Välj ALDRIG nyheter om: krig, väpnade konflikter, terror, våld, brott, olyckor, död, självmord, sjukdomsutbrott med döda, sex, droger, eller enskilda politiker och partier. Inga värderande eller politiskt vinklade ledtrådar — beskriv bara vad som hänt. Hellre ekonomi, väder och klimat, natur, vetenskap, rymden, teknik, sport, kultur och hur samhället fungerar.
+Välj ALDRIG nyheter om: krig, väpnade konflikter, terror, våld, brott, olyckor, död, självmord, sjukdomsutbrott med döda, sex, droger, eller nyheter som handlar om en namngiven person (politiker, kändisar) eller ett parti. Nämn aldrig personnamn i ledtråden. Inga värderande eller politiskt vinklade ledtrådar — beskriv bara vad som hänt. Hellre ekonomi, väder och klimat, natur, vetenskap, rymden, teknik, sport, kultur och hur samhället fungerar.
 
-Skolbegrepp att välja bland: ${CONCEPTS.join(", ")}.
+Exempel på bra skolbegrepp (inspiration, inget krav): ${CONCEPTS.join(", ")}.
 
 Svara ENDAST med giltig JSON utan markdown:
 {"ord": [{"svar": "INFLATION", "ledtrad": "...", "begrepp": "inflation", "amne": "Samhällskunskap", "rubriker": [3, 41]}]}`;
 
-async function askClaude(headlines: Headline[], feedback: string) {
-  const list = headlines.map((h) => `[${h.id}] ${h.source}: ${h.title}${h.description ? ` — ${h.description}` : ""}`).join("\n");
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
+let workingModel: string | null = null;
+
+async function callModel(model: string, list: string, feedback: string) {
+  return await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
       "x-api-key": ANTHROPIC_API_KEY!,
@@ -217,14 +238,32 @@ async function askClaude(headlines: Headline[], feedback: string) {
       ...(ANTHROPIC_WORKSPACE_ID ? { "anthropic-workspace-id": ANTHROPIC_WORKSPACE_ID } : {}),
     },
     body: JSON.stringify({
-      model: MODEL,
-      max_tokens: 2500,
+      model,
+      max_tokens: 3500,
       system: SYSTEM_PROMPT,
       messages: [{ role: "user", content: `Veckans rubriker:\n${list}${feedback ? `\n\n${feedback}` : ""}` }],
     }),
     signal: AbortSignal.timeout(60000),
   });
-  if (!res.ok) throw new Error(`Anthropic ${res.status}: ${(await res.text()).slice(0, 300)}`);
+}
+
+async function askClaude(headlines: Headline[], feedback: string) {
+  const list = headlines.map((h) => `[${h.id}] ${h.source}: ${h.title}${h.description ? ` — ${h.description}` : ""}`).join("\n");
+  let res: Response | null = null;
+  let lastError = "";
+  for (const model of workingModel ? [workingModel] : MODELS) {
+    res = await callModel(model, list, feedback);
+    if (res.ok) {
+      workingModel = model;
+      break;
+    }
+    lastError = `Anthropic ${res.status} (${model}): ${(await res.text()).slice(0, 300)}`;
+    // Bara "modellen finns inte / ingen åtkomst" ska ge nästa modell en chans.
+    if (![400, 403, 404].includes(res.status)) break;
+    console.log("Modellen gick inte att använda, provar nästa:", lastError);
+    res = null;
+  }
+  if (!res || !res.ok) throw new Error(lastError || "AI-anropet misslyckades");
   const data = await res.json();
   const text: string = data.content?.find((b: { type: string }) => b.type === "text")?.text ?? "";
   const first = text.indexOf("{");
@@ -250,6 +289,10 @@ function validate(raw: Awaited<ReturnType<typeof askClaude>>, headlines: Headlin
     if (clue.toUpperCase().includes(answer.slice(0, Math.max(4, answer.length - 2)))) { rejected.push(`${label}: ledtråden avslöjar svaret`); continue; }
     const cited = [...new Set(o.rubriker ?? [])].map((id) => byId.get(Number(id))).filter((h): h is Headline => !!h);
     if (!confirmedByTwoSources(cited)) { rejected.push(`${label}: inte bekräftad av två källor`); continue; }
+    if (!answerAppearsInHeadlines(answer, String(o.begrepp ?? ""), cited)) {
+      rejected.push(`${label}: ordet finns inte i nyheterna det sägs bygga på`);
+      continue;
+    }
     const haystack = `${answer} ${clue} ${o.begrepp ?? ""} ${cited.map((h) => `${h.title} ${h.description}`).join(" ")}`;
     if (BLOCKED.test(haystack)) { rejected.push(`${label}: spärrat ämne`); continue; }
     seen.add(answer);
@@ -310,19 +353,33 @@ Deno.serve(async (req) => {
   try {
     let best: { entries: Entry[]; layout: ReturnType<typeof layoutCrossword> } | null = null;
     let feedback = "";
-    for (let round = 0; round < 2; round++) {
+    let lastRejected: string[] = [];
+    // Godkända ord sparas mellan rundorna, så runda två bygger vidare på
+    // det som redan klarat kontrollerna istället för att börja om.
+    const accepted: Entry[] = [];
+    const startedAt = Date.now();
+    for (let round = 0; round < 3; round++) {
+      // Edge-funktioner har en tidsgräns; starta ingen ny runda efter 80 sekunder.
+      if (round > 0 && Date.now() - startedAt > 80_000) break;
       const raw = await askClaude(headlines, feedback);
-      const { entries, rejected } = validate(raw, headlines);
+      const { entries: fresh, rejected } = validate(raw, headlines);
+      for (const e of fresh) if (!accepted.some((a) => a.answer === e.answer)) accepted.push(e);
+      const entries = accepted;
+      lastRejected = rejected;
+      console.log("nutidskryss runda", round + 1, "godkända:", entries.map((e) => e.answer), "underkända:", rejected);
       const layout = layoutCrossword(entries.map((e) => e.answer));
       const placed = layout.placements.map((p) => entries[p.index]);
       const finalLayout = layoutCrossword(placed.map((e) => e.answer));
       if (!best || placed.length > best.entries.length) best = { entries: placed, layout: finalLayout };
       if (placed.length >= 5) break;
-      feedback = `Förra försöket gav bara ${placed.length} användbara ord. Underkända: ${rejected.join("; ") || "inga"}. Ord som inte gick att korsa: ${entries.filter((_, i) => !layout.placements.some((p) => p.index === i)).map((e) => e.answer).join(", ") || "inga"}. Försök igen med 8 nya ord som delar fler bokstäver.`;
+      feedback = `Förra försöket gav bara ${placed.length} användbara ord (minst 5 behövs). Underkända: ${rejected.join("; ") || "inga"}. Ord som inte gick att korsa: ${entries.filter((_, i) => !layout.placements.some((p) => p.index === i)).map((e) => e.answer).join(", ") || "inga"}. Behåll inte de godkända orden (${entries.map((e) => e.answer).join(", ") || "inga"}) — föreslå 12 NYA ord som delar bokstäver med dem.`;
     }
 
     if (!best || best.entries.length < 5) {
-      return fail(`AI:n hittade bara ${best?.entries.length ?? 0} ord som klarade kontrollerna (minst 5 behövs).`);
+      return fail(
+        `AI:n hittade bara ${best?.entries.length ?? 0} ord som klarade kontrollerna (minst 5 behövs). ` +
+          `Underkända: ${lastRejected.slice(0, 12).join("; ") || "inga"}.`,
+      );
     }
 
     const row = await insertKryss({
