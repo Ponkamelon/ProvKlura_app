@@ -56,6 +56,8 @@ const BLOCKED = /\b(krig|krigs|döda|dödad|dödade|dödats|död|döds|dödsfall
 type Headline = { id: number; source: string; title: string; description: string; url: string };
 
 type Entry = {
+  /** Rubrik-id:n ordet bygger på (används bara internt för att sprida orden över nyheter). */
+  headlineIds?: number[];
   answer: string;
   clue: string;
   concept: string;
@@ -217,6 +219,7 @@ Uppgift: föreslå 12 ord till ett korsord (vi väljer sedan ut de som passar ih
 - Ledtråden kopplar begreppet till en nyhet från veckan, skriven med egna ord på enkel svenska. Max 18 ord. Den får INTE innehålla svaret, inte en böjning av det och inte ett sammansatt ord med svaret i (är svaret RÄNTA får ledtråden inte innehålla "räntan" eller "styrräntan").
 - Varje ord ska bygga på en nyhet som finns hos MINST TVÅ OLIKA källor. Ange id:n för rubrikerna i "rubriker" — minst två id från olika källor som handlar om SAMMA händelse. Ta med alla rubriker du hittar om händelsen, gärna 3–4.
 - "amne": skolämnet begreppet hör till (Samhällskunskap, Geografi, Historia, Biologi, Fysik, Kemi, Teknik).
+- Sprid orden över OLIKA nyheter: högst två ord per nyhet. Ett kryss om bara en händelse blir tråkigt.
 - Välj gärna ord som delar bokstäver med varandra, så de går att korsa.
 
 Välj ALDRIG nyheter om: krig, väpnade konflikter, terror, våld, brott, olyckor, död, självmord, sjukdomsutbrott med döda, sex, droger, eller nyheter som handlar om en namngiven person (politiker, kändisar) eller ett parti. Nämn aldrig personnamn i ledtråden. Inga värderande eller politiskt vinklade ledtrådar — beskriv bara vad som hänt. Hellre ekonomi, väder och klimat, natur, vetenskap, rymden, teknik, sport, kultur och hur samhället fungerar.
@@ -297,6 +300,7 @@ function validate(raw: Awaited<ReturnType<typeof askClaude>>, headlines: Headlin
     if (BLOCKED.test(haystack)) { rejected.push(`${label}: spärrat ämne`); continue; }
     seen.add(answer);
     entries.push({
+      headlineIds: cited.map((h) => h.id),
       answer,
       clue,
       concept: String(o.begrepp ?? answer.toLowerCase()).slice(0, 60),
@@ -363,7 +367,16 @@ Deno.serve(async (req) => {
       if (round > 0 && Date.now() - startedAt > 80_000) break;
       const raw = await askClaude(headlines, feedback);
       const { entries: fresh, rejected } = validate(raw, headlines);
-      for (const e of fresh) if (!accepted.some((a) => a.answer === e.answer)) accepted.push(e);
+      for (const e of fresh) {
+        if (accepted.some((a) => a.answer === e.answer)) continue;
+        // Högst två ord per nyhet: räkna godkända ord som delar någon rubrik med det här.
+        const sameStory = accepted.filter((a) => a.headlineIds?.some((id) => e.headlineIds?.includes(id))).length;
+        if (sameStory >= 2) {
+          rejected.push(`${e.answer}: samma nyhet används redan av två ord`);
+          continue;
+        }
+        accepted.push(e);
+      }
       const entries = accepted;
       lastRejected = rejected;
       console.log("nutidskryss runda", round + 1, "godkända:", entries.map((e) => e.answer), "underkända:", rejected);
@@ -386,7 +399,7 @@ Deno.serve(async (req) => {
       week_start: weekStart,
       status: "draft",
       title,
-      entries: best.entries,
+      entries: best.entries.map(({ headlineIds: _ids, ...e }) => e),
       layout: best.layout,
     });
     return json({ status: "draft", id: row.id, words: best.entries.length, feedStats });
