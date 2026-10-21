@@ -361,6 +361,8 @@ Deno.serve(async (req) => {
     // Godkända ord sparas mellan rundorna, så runda två bygger vidare på
     // det som redan klarat kontrollerna istället för att börja om.
     const accepted: Entry[] = [];
+    // Ord som bara föll på "högst två per nyhet" — används om krysset annars blir för litet.
+    const overflow: Entry[] = [];
     const startedAt = Date.now();
     for (let round = 0; round < 3; round++) {
       // Edge-funktioner har en tidsgräns; starta ingen ny runda efter 80 sekunder.
@@ -373,6 +375,7 @@ Deno.serve(async (req) => {
         const sameStory = accepted.filter((a) => a.headlineIds?.some((id) => e.headlineIds?.includes(id))).length;
         if (sameStory >= 2) {
           rejected.push(`${e.answer}: samma nyhet används redan av två ord`);
+          if (!overflow.some((o) => o.answer === e.answer)) overflow.push(e);
           continue;
         }
         accepted.push(e);
@@ -386,6 +389,17 @@ Deno.serve(async (req) => {
       if (!best || placed.length > best.entries.length) best = { entries: placed, layout: finalLayout };
       if (placed.length >= 5) break;
       feedback = `Förra försöket gav bara ${placed.length} användbara ord (minst 5 behövs). Underkända: ${rejected.join("; ") || "inga"}. Ord som inte gick att korsa: ${entries.filter((_, i) => !layout.placements.some((p) => p.index === i)).map((e) => e.answer).join(", ") || "inga"}. Behåll inte de godkända orden (${entries.map((e) => e.answer).join(", ") || "inga"}) — föreslå 12 NYA ord som delar bokstäver med dem.`;
+    }
+
+    // Spridning över nyheter är ett önskemål, inte ett krav: räcker orden
+    // inte fylls krysset på med ord från samma nyhet.
+    if (best && best.entries.length < 5 && overflow.length) {
+      const pool = [...accepted, ...overflow.filter((o) => !accepted.some((a) => a.answer === o.answer))];
+      const layout = layoutCrossword(pool.map((e) => e.answer));
+      const placed = layout.placements.map((p) => pool[p.index]);
+      if (placed.length > best.entries.length) {
+        best = { entries: placed, layout: layoutCrossword(placed.map((e) => e.answer)) };
+      }
     }
 
     if (!best || best.entries.length < 5) {
