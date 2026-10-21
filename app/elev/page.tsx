@@ -2,10 +2,12 @@ import Link from "next/link";
 import { requireProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { Medal, medalForPercent } from "@/components/Medal";
-import { currentWeekStart } from "@/lib/nutid/week";
+import { currentWeekStart, stockholmTodayIso } from "@/lib/nutid/week";
 import { UpdatedBadge } from "@/components/UpdatedBadge";
 import { getUpdatedStudySetIds } from "@/lib/quiz/variants";
 import { Icon } from "@/components/Icon";
+import { StudyOverview } from "@/components/StudyOverview";
+import { parseOverview } from "@/lib/overview/streak";
 
 export default async function ElevDashboard() {
   const profile = await requireProfile("student");
@@ -105,11 +107,19 @@ export default async function ElevDashboard() {
     .not("completed_at", "is", null);
   const nutidDone = (nutidDoneCount ?? 0) > 0;
 
+  // Svit, antal klara test och pluggtid. Går det inte att hämta visas nollor
+  // hellre än att sidan kraschar.
+  const { data: overviewRaw, error: overviewError } = await supabase.rpc("my_study_overview");
+  if (overviewError) console.error("Kunde inte hämta elevöversikt:", overviewError);
+  const overview = parseOverview(overviewRaw);
+
   return (
     <div>
       <h1 className="font-display text-2xl font-semibold text-navy">
         Hej {firstName}! 👋
       </h1>
+
+      <StudyOverview data={overview} today={stockholmTodayIso()} />
 
       {hasNationella && (
         <Link

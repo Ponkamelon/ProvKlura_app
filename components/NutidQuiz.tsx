@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { saveNutidAnswersAction } from "@/app/actions/nutid";
 import { SIGNS, type StudentQuestion } from "@/lib/nutid/types";
+import { useActiveTime } from "@/lib/useActiveTime";
 
 /**
  * Nutidskrysset som en tipskupong: en fråga i taget, tre alternativ
@@ -33,6 +34,7 @@ export function NutidQuiz({
   const [index, setIndex] = useState(firstOpen === -1 ? questions.length : firstOpen);
   const [revealed, setRevealed] = useState(false);
   const headingRef = useRef<HTMLHeadingElement | null>(null);
+  const activeTime = useActiveTime();
 
   const done = index >= questions.length;
   const correctCount = answers.filter((a, i) => a !== null && a === questions[i].correct).length;
@@ -47,7 +49,7 @@ export function NutidQuiz({
     next[index] = option;
     setAnswers(next);
     setRevealed(true);
-    void saveNutidAnswersAction({ kryssId, answers: next }).catch(() => {
+    void saveNutidAnswersAction({ kryssId, answers: next, activeSeconds: activeTime.take() }).catch(() => {
       // Sparas igen vid nästa svar — eleven ska inte märka något.
     });
   }

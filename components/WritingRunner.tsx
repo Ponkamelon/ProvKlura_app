@@ -14,6 +14,7 @@ import {
   type WritingResult,
 } from "@/lib/writing/types";
 import { Icon } from "@/components/Icon";
+import { useActiveTime } from "@/lib/useActiveTime";
 
 type Screen =
   | { kind: "what" }
@@ -140,6 +141,7 @@ export function WritingRunner({
     return seen;
   }, [screens]);
 
+  const activeTime = useActiveTime();
   const [position, setPosition] = useState(0);
   const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
   const [draftLoaded, setDraftLoaded] = useState(false);
@@ -243,6 +245,7 @@ export function WritingRunner({
         level,
         correct: finalCorrect,
         total: trainingQuestions.length,
+        activeSeconds: activeTime.take(),
       });
     } catch {
       // Resultatet visas ändå — att det inte sparades stoppar inte eleven.
@@ -254,6 +257,7 @@ export function WritingRunner({
     const text = mode === "gor_sjalv" ? draft.assembled : draft.testText;
     setSubmitting(true);
     setErrorMessage(null);
+    const activeSeconds = activeTime.take();
     try {
       const response = await submitWritingAction({
         studySetId,
@@ -263,8 +267,10 @@ export function WritingRunner({
         parts: mode === "gor_sjalv" ? draft.parts : null,
         text,
         hintsUsed,
+        activeSeconds,
       });
       if (!response.ok) {
+        activeTime.giveBack(activeSeconds);
         setErrorMessage(response.message);
         return;
       }
@@ -278,6 +284,7 @@ export function WritingRunner({
       setHintsUsed(0);
       goNext();
     } catch {
+      activeTime.giveBack(activeSeconds);
       setErrorMessage("Det gick inte att skicka just nu. Din text finns kvar. Försök igen om en stund.");
     } finally {
       setSubmitting(false);

@@ -16,6 +16,8 @@ import { MIN_QUESTIONS, type NutidQuestion } from "@/lib/nutid/types";
 export async function saveNutidAnswersAction(params: {
   kryssId: string;
   answers: (number | null)[];
+  /** Aktiv tid sedan förra sparningen (räknas i webbläsaren). */
+  activeSeconds?: number;
 }): Promise<{ ok: boolean }> {
   const profile = await requireProfile("student");
   const supabase = createClient();
@@ -38,7 +40,7 @@ export async function saveNutidAnswersAction(params: {
 
   const { data: existing } = await supabase
     .from("nutidskryss_attempts")
-    .select("id, completed_at")
+    .select("id, completed_at, active_seconds")
     .eq("student_id", profile.id)
     .eq("kryss_id", kryss.id)
     .maybeSingle();
@@ -46,8 +48,12 @@ export async function saveNutidAnswersAction(params: {
   // Ett inlämnat kryss ändras inte i efterhand (som på en kupong).
   if (existing?.completed_at) return { ok: true };
 
+  // Rimlighetsgräns: högst 15 minuter per fråga.
+  const addSeconds = Math.max(0, Math.min(900, Math.round(Number(params.activeSeconds) || 0)));
+
   const values = {
     answers,
+    active_seconds: (existing?.active_seconds ?? 0) + addSeconds,
     solved_count: correct,
     total: questions.length,
     completed_at: completed ? new Date().toISOString() : null,

@@ -13,6 +13,11 @@ function stockholmToday(): Date {
   return new Date(`${parts}T12:00:00Z`);
 }
 
+/** Dagens datum i svensk tid, t.ex. "2026-10-21". */
+export function stockholmTodayIso(): string {
+  return toIsoDate(stockholmToday());
+}
+
 export function mondayOf(date: Date): Date {
   const weekday = (date.getUTCDay() + 6) % 7;
   return new Date(date.getTime() - weekday * 86400000);

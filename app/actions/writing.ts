@@ -40,11 +40,17 @@ async function loadWritingSet(studySetId: string): Promise<WritingContent | null
 }
 
 /** Steg D (Träna): sparar bara utfallet så appen minns vad eleven redan kan. */
+/** Aktiv skrivtid från webbläsaren, högst 90 minuter per inlämning. */
+function clampSeconds(value: unknown): number {
+  return Math.max(0, Math.min(5400, Math.round(Number(value) || 0)));
+}
+
 export async function saveTrainingResultAction(params: {
   studySetId: string;
   level: TimeLevel;
   correct: number;
   total: number;
+  activeSeconds?: number;
 }): Promise<{ result: WritingResult }> {
   const profile = await requireProfile("student");
   const supabase = createClient();
@@ -65,6 +71,7 @@ export async function saveTrainingResultAction(params: {
     time_level: params.level,
     result,
     feedback: { correct, total },
+    active_seconds: clampSeconds(params.activeSeconds),
   });
   if (error) console.error("Kunde inte spara träningsresultat:", error);
 
@@ -86,6 +93,7 @@ export async function submitWritingAction(params: {
   parts: Record<string, string> | null;
   text: string;
   hintsUsed: number;
+  activeSeconds?: number;
 }): Promise<
   | { ok: true; result: WritingResult; feedback: WritingFeedback }
   | { ok: false; message: string }
@@ -189,6 +197,7 @@ export async function submitWritingAction(params: {
     word_count: wordCount,
     hints_used: Math.max(0, Math.min(99, Math.floor(params.hintsUsed) || 0)),
     feedback,
+    active_seconds: clampSeconds(params.activeSeconds),
   });
   if (error) console.error("Kunde inte spara elevens text:", error);
 
