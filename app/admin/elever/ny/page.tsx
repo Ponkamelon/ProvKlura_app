@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createInvitationAction } from "@/app/actions/students";
+import { Icon } from "@/components/Icon";
 
 export default function NyElevPage({
   searchParams,
@@ -8,7 +9,8 @@ export default function NyElevPage({
 }) {
   return (
     <div className="mx-auto max-w-md">
-      <Link href="/admin/elever" className="text-sm text-navy/50 underline">
+      <Link href="/admin/elever" className="link-back">
+        <Icon name="tillbaka" size={16} />
         Avbryt
       </Link>
       <h1 className="mt-2 font-display text-2xl font-semibold text-navy">
@@ -69,6 +71,7 @@ export default function NyElevPage({
           </select>
         </div>
         <button type="submit" className="btn-primary w-full">
+          <Icon name="skicka-inbjudan" />
           Skicka inbjudan
         </button>
       </form>

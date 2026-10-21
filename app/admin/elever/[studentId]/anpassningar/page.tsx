@@ -2,6 +2,7 @@ import Link from "next/link";
 import { requireProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { applyPresetAction, updatePreferencesAction } from "@/app/actions/preferences";
+import { Icon } from "@/components/Icon";
 
 const PRESETS = [
   { key: "fokus", label: "Fokus", description: "Korta pass, minimal text, snabb feedback" },
@@ -46,9 +47,10 @@ export default async function AnpassningarPage({
     <div className="mx-auto max-w-2xl">
       <Link
         href={`/admin/elever/${student.id}`}
-        className="text-sm text-navy/50 underline"
+        className="link-back"
       >
-        ← Tillbaka till {student.display_name}
+        <Icon name="tillbaka" size={16} />
+        Tillbaka till {student.display_name}
       </Link>
       <h1 className="mt-2 font-display text-2xl font-semibold text-navy">
         Anpassningar för {student.display_name}
@@ -258,6 +260,7 @@ export default async function AnpassningarPage({
           </div>
 
           <button type="submit" className="btn-primary w-full">
+            <Icon name="spara" />
             Spara
           </button>
         </form>

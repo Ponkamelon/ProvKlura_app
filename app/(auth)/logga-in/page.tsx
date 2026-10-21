@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { signInAction } from "@/app/actions/auth";
+import { Icon } from "@/components/Icon";
 
 export default function LoginPage({
   searchParams,
@@ -53,6 +54,7 @@ export default function LoginPage({
             />
           </div>
           <button type="submit" className="btn-primary w-full">
+            <Icon name="logga-in" />
             Logga in
           </button>
         </form>
@@ -67,6 +69,7 @@ export default function LoginPage({
 
       <div className="mx-auto mt-6 w-full max-w-sm text-center">
         <Link href="/faq" className="btn-tertiary w-full justify-center">
+          <Icon name="vanliga-fragor" />
           Vanliga frågor
         </Link>
       </div>

@@ -5,6 +5,7 @@ import { Medal, medalForPercent } from "@/components/Medal";
 import { currentWeekStart } from "@/lib/nutid/week";
 import { UpdatedBadge } from "@/components/UpdatedBadge";
 import { getUpdatedStudySetIds } from "@/lib/quiz/variants";
+import { Icon } from "@/components/Icon";
 
 export default async function ElevDashboard() {
   const profile = await requireProfile("student");
@@ -124,7 +125,7 @@ export default async function ElevDashboard() {
               Dina tilldelade övningsprov inför nationella proven
             </p>
           </div>
-          <span className="text-navy/40">→</span>
+          <Icon name="nasta" className="text-navy/40" />
         </Link>
       )}
 
@@ -139,7 +140,7 @@ export default async function ElevDashboard() {
               Träna på att skriva, en liten bit i taget
             </p>
           </div>
-          <span className="text-navy/40">→</span>
+          <Icon name="nasta" className="text-navy/40" />
         </Link>
       )}
 
@@ -155,7 +156,7 @@ export default async function ElevDashboard() {
               : "Ett litet kryss om vad som händer just nu"}
           </p>
         </div>
-        <span className="text-navy/40">→</span>
+        <Icon name="nasta" className="text-navy/40" />
       </Link>
 
       <Link
@@ -168,7 +169,7 @@ export default async function ElevDashboard() {
             Svara på några frågor och få idéer till din text
           </p>
         </div>
-        <span className="text-navy/40">→</span>
+        <Icon name="nasta" className="text-navy/40" />
       </Link>
 
       {!studySets.length ? (

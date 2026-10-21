@@ -6,6 +6,7 @@ import { saveNutidProgressAction } from "@/app/actions/nutid";
 import { NutidGrid, type GridCell } from "@/components/NutidGrid";
 import { normalizeAnswer, type CrosswordLayout } from "@/lib/nutid/layout";
 import type { StudentEntry } from "@/lib/nutid/types";
+import { Icon } from "@/components/Icon";
 
 type Message = { tone: "ok" | "hint"; text: string } | null;
 
@@ -135,8 +136,9 @@ export function NutidKryss({
   return (
     <div data-nutid>
       <div className="flex items-center justify-between gap-3">
-        <Link href="/elev/nutid" className="text-sm text-navy/60 underline">
-          ← Nutidskrysset
+        <Link href="/elev/nutid" className="link-back">
+          <Icon name="tillbaka" size={16} />
+          Nutidskrysset
         </Link>
         <span className="nutid-badge" aria-live="polite">
           {solved.size} av {placements.length} ord
@@ -230,7 +232,8 @@ export function NutidKryss({
           )}
 
           <div className="mt-4 flex flex-wrap gap-2">
-            <button type="button" onClick={stuck} className="nutid-chip border-dashed">
+            <button type="button" onClick={stuck} className="nutid-chip inline-flex items-center gap-1.5 border-dashed">
+              <Icon name="jag-fastnar" size={16} />
               Jag fastnar
             </button>
             <button

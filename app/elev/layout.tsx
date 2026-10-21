@@ -3,6 +3,7 @@ import { OwlMark } from "@/components/OwlMark";
 import { HouseIcon } from "@/components/HouseIcon";
 import { requireProfile } from "@/lib/auth";
 import { signOutAction } from "@/app/actions/auth";
+import { Icon } from "@/components/Icon";
 
 export default async function ElevLayout({
   children,
@@ -31,11 +32,13 @@ export default async function ElevLayout({
           </Link>
         </div>
         <div className="flex items-center gap-4">
-          <Link href="/elev/installningar" className="text-sm text-navy/50 underline">
+          <Link href="/elev/installningar" className="link-back text-navy/70">
+            <Icon name="installningar" size={16} />
             Inställningar
           </Link>
           <form action={signOutAction}>
-            <button type="submit" className="text-sm text-navy/50 underline">
+            <button type="submit" className="link-back text-navy/70">
+              <Icon name="logga-ut" size={16} />
               Logga ut
             </button>
           </form>

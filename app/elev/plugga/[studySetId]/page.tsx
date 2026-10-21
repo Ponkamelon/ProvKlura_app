@@ -5,6 +5,7 @@ import { Medal, medalForPercent } from "@/components/Medal";
 import { UpdatedBadge } from "@/components/UpdatedBadge";
 import { getUpdatedStudySetIds } from "@/lib/quiz/variants";
 import type { Tables } from "@/lib/database.types";
+import { Icon } from "@/components/Icon";
 
 type StudySetWithChapter = Tables<"study_sets"> & {
   chapters: { title: string; subjects: { name: string } | null } | null;
@@ -79,8 +80,9 @@ export default async function QuizStartPage({
         <p className="mt-4 text-navy/70">
           Inga frågor är redo än. Kolla igen lite senare.
         </p>
-        <Link href="/elev" className="mt-4 inline-block text-sm text-navy/50 underline">
-          ← Tillbaka
+        <Link href="/elev" className="link-back mt-4">
+          <Icon name="tillbaka" size={16} />
+          Tillbaka
         </Link>
       </div>
     );
@@ -88,8 +90,9 @@ export default async function QuizStartPage({
 
   return (
     <div>
-      <Link href="/elev" className="text-sm text-navy/50 underline">
-        ← Tillbaka
+      <Link href="/elev" className="link-back">
+        <Icon name="tillbaka" size={16} />
+        Tillbaka
       </Link>
       <p className="mt-3 text-xs text-navy/50">{studySet.chapters?.subjects?.name}</p>
       <div className="mt-1 flex items-center justify-between gap-3">
@@ -132,7 +135,10 @@ export default async function QuizStartPage({
             href={`/elev/plugga/${params.studySetId}/quiz?mode=mistakes`}
             className="notebook-card flex items-center justify-between border-2 border-coral p-4"
           >
-            <span className="font-medium text-navy">Träna mina fel</span>
+            <span className="inline-flex items-center gap-2 font-medium text-navy">
+              <Icon name="trana-fel" className="text-coral-dark" />
+              Träna mina fel
+            </span>
             <span className="text-sm text-coral">{needsPracticeCount} frågor</span>
           </Link>
         )}

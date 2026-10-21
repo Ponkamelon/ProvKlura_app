@@ -79,6 +79,35 @@
     @apply inline-flex items-center justify-center rounded-full bg-turquoise px-6 py-3 font-sans font-semibold text-navy shadow-card transition-transform hover:opacity-90 active:scale-[0.98];
   }
 
+  /* ───── Ikonknappar (designprofilen: komponenten Ikonknapp) ───── */
+
+  /* Destruktiv: vit med korallröd kant, så den aldrig förväxlas med
+     huvudknappen. */
+  .btn-danger {
+    @apply inline-flex items-center justify-center gap-2 rounded-full border-2 border-coral-dark bg-white px-6 py-3 font-sans font-semibold text-coral-dark transition-colors hover:bg-coral-dark hover:text-white active:scale-[0.98];
+  }
+
+  /* Ikon + text i alla knappar. */
+  .btn-primary,
+  .btn-secondary,
+  .btn-tertiary {
+    @apply gap-2;
+  }
+
+  /* Tillbaka-/navigeringslänk med ikon. */
+  .link-back {
+    @apply inline-flex items-center gap-1.5 text-sm font-medium text-ocean hover:underline;
+  }
+
+  /* Rund knapp med bara ikon — kräver aria-label. */
+  .icon-btn {
+    @apply inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-sand-deep bg-white text-navy transition-colors hover:bg-seafoam active:scale-[0.96];
+  }
+
+  .icon-btn-danger {
+    @apply text-coral-dark hover:bg-coral-dark hover:text-white;
+  }
+
   /* ───── Skrivklura ─────
      Samma app, men med diskret avvikande ram och bakgrund så eleven
      direkt ser "nu skriver jag": linjerat papper istället för slät sand,

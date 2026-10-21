@@ -11,15 +11,17 @@ export function SubmitButton({
   children,
   pendingText,
   className,
+  ariaLabel,
 }: {
   children: React.ReactNode;
   pendingText: string;
   className?: string;
+  ariaLabel?: string;
 }) {
   const { pending } = useFormStatus();
 
   return (
-    <button type="submit" disabled={pending} className={`${className} disabled:opacity-60`}>
+    <button type="submit" disabled={pending} aria-label={ariaLabel} className={`${className} disabled:opacity-60`}>
       {pending ? pendingText : children}
     </button>
   );

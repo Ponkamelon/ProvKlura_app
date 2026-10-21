@@ -4,6 +4,7 @@ import { HouseIcon } from "@/components/HouseIcon";
 import { requireProfile } from "@/lib/auth";
 import { signOutAction } from "@/app/actions/auth";
 import { createClient } from "@/lib/supabase/server";
+import { Icon } from "@/components/Icon";
 
 export default async function AdminLayout({
   children,
@@ -69,7 +70,8 @@ export default async function AdminLayout({
               {profile.display_name}
             </span>
             <form action={signOutAction}>
-              <button type="submit" className="text-ocean underline">
+              <button type="submit" className="link-back">
+                <Icon name="logga-ut" size={16} />
                 Logga ut
               </button>
             </form>

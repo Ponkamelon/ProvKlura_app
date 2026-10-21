@@ -4,6 +4,7 @@ import { requireProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { NutidProgressView } from "@/components/NutidProgressView";
 import { computeProgress, type AttemptRow } from "@/lib/nutid/progress";
+import { Icon } from "@/components/Icon";
 
 export default async function StudentDetailPage({
   params,
@@ -76,8 +77,9 @@ export default async function StudentDetailPage({
 
   return (
     <div>
-      <Link href="/admin/elever" className="text-sm text-navy/50 underline">
-        ← Alla elever
+      <Link href="/admin/elever" className="link-back">
+        <Icon name="tillbaka" size={16} />
+        Alla elever
       </Link>
 
       <div className="mt-2 flex flex-wrap items-center justify-between gap-4">
@@ -89,6 +91,7 @@ export default async function StudentDetailPage({
           <WaveDivider className="mt-2 h-3 w-24" color="#FF6B4A" />
         </div>
         <Link href={`/admin/elever/${student.id}/anpassningar`} className="btn-secondary">
+          <Icon name="anpassningar" />
           Anpassningar
         </Link>
       </div>

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { WaveDivider } from "@/components/WaveDivider";
 import { requireProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { Icon } from "@/components/Icon";
 
 export default async function AdminDashboard() {
   const profile = await requireProfile("admin");
@@ -72,7 +73,10 @@ export default async function AdminDashboard() {
           href="/admin/prov/ny"
           className="notebook-card flex flex-col items-center justify-center gap-2 p-6 text-center transition-transform hover:-translate-y-0.5"
         >
-          <span className="btn-primary">+ Nytt pluggprojekt</span>
+          <span className="btn-primary">
+            <Icon name="lagg-till" />
+            Nytt pluggprojekt
+          </span>
         </Link>
 
         <Link

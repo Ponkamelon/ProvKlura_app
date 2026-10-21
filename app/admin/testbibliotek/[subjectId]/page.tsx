@@ -9,6 +9,7 @@ import {
   shareOfficialTestAction,
   unshareOfficialTestAction,
 } from "@/app/actions/testLibrary";
+import { Icon } from "@/components/Icon";
 
 type StudySetRow = {
   id: string;
@@ -145,7 +146,8 @@ export default async function TestbibliotekSubjectPage({
           </p>
         ) : (
           <p className="mt-1 text-sm">
-            <Link href={`/admin/omformulera/${set.id}`} className="text-ocean underline">
+            <Link href={`/admin/omformulera/${set.id}`} className="inline-flex items-center gap-1 font-medium text-ocean hover:underline">
+              <Icon name="formulera-om" size={16} />
               {rewordedSetIds.has(set.id) ? "Nya formuleringar (aktiva)" : "Formulera om frågorna"}
             </Link>
           </p>
@@ -191,6 +193,7 @@ export default async function TestbibliotekSubjectPage({
               ))}
             </select>
             <button type="submit" className="btn-secondary whitespace-nowrap">
+              <Icon name="dela" />
               Dela
             </button>
           </form>
@@ -211,8 +214,9 @@ export default async function TestbibliotekSubjectPage({
 
   return (
     <div>
-      <Link href="/admin/testbibliotek" className="text-sm text-navy/50 underline">
-        ← Testbibliotek
+      <Link href="/admin/testbibliotek" className="link-back">
+        <Icon name="tillbaka" size={16} />
+        Testbibliotek
       </Link>
       <h1 className="mt-2 font-display text-3xl font-semibold text-navy">
         {subject.name}

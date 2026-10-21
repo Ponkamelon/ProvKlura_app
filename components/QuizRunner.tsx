@@ -9,6 +9,7 @@ import {
   finishAttemptAction,
 } from "@/app/actions/quiz";
 import { Medal, medalForPercent } from "@/components/Medal";
+import { Icon } from "@/components/Icon";
 
 type QuizQuestion = {
   id: string;
@@ -204,8 +205,9 @@ export function QuizRunner({
         <button
           type="button"
           onClick={handleCancel}
-          className="text-sm text-navy/50 underline"
+          className="link-back text-navy/60"
         >
+          <Icon name="avbryt" size={16} />
           Avbryt
         </button>
         <p className="font-mono text-sm text-navy/50">
@@ -314,6 +316,7 @@ export function QuizRunner({
             className="btn-primary w-full disabled:opacity-40"
           >
             {submitting ? "..." : buttonLabel}
+            {!submitting && buttonLabel === "Nästa fråga" && <Icon name="nasta" />}
           </button>
         </div>
       </div>

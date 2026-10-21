@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { OwlMark } from "@/components/OwlMark";
 import { FAQ } from "@/components/FAQ";
+import { Icon } from "@/components/Icon";
 
 export const metadata = {
   title: "Vanliga frågor – ProvKlura",
@@ -17,8 +18,9 @@ export default function FaqPage() {
           </span>
         </Link>
 
-        <Link href="/" className="mt-8 inline-block text-sm text-navy/50 underline">
-          ← Tillbaka
+        <Link href="/" className="link-back mt-8">
+          <Icon name="tillbaka" size={16} />
+          Tillbaka
         </Link>
 
         <FAQ className="mt-6" />

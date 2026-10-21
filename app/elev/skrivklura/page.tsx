@@ -3,6 +3,7 @@ import { WaveDivider } from "@/components/WaveDivider";
 import { requireProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { RESULT_LABEL, type WritingResult } from "@/lib/writing/types";
+import { Icon } from "@/components/Icon";
 
 const RESULT_RANK: Record<WritingResult, number> = { trana: 1, nastan: 2, kan: 3 };
 
@@ -52,8 +53,9 @@ export default async function SkrivkluraPage() {
 
   return (
     <div data-skrivklura>
-      <Link href="/elev" className="text-sm text-navy/60 underline">
-        ← Mina pluggprojekt
+      <Link href="/elev" className="link-back">
+        <Icon name="tillbaka" size={16} />
+        Mina pluggprojekt
       </Link>
       <h1 className="mt-2 font-display text-3xl font-semibold text-navy">Skrivklura</h1>
       <WaveDivider className="mt-2 h-3 w-24" color="#5B4B9E" />
@@ -97,7 +99,7 @@ export default async function SkrivkluraPage() {
           <p className="font-medium text-navy">Fastnar du på idéer? ✨</p>
           <p className="text-sm text-navy/60">Prova Idéverkstaden</p>
         </div>
-        <span className="text-navy/40">→</span>
+        <Icon name="nasta" className="text-navy/40" />
       </Link>
     </div>
   );

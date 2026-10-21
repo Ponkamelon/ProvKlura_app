@@ -2,14 +2,16 @@ import Link from "next/link";
 import { WaveDivider } from "@/components/WaveDivider";
 import { IdeaWorkshop } from "@/components/IdeaWorkshop";
 import { requireProfile } from "@/lib/auth";
+import { Icon } from "@/components/Icon";
 
 export default async function IdeverkstadPage() {
   await requireProfile("student");
 
   return (
     <div data-skrivklura>
-      <Link href="/elev" className="text-sm text-navy/60 underline">
-        ← Startsidan
+      <Link href="/elev" className="link-back">
+        <Icon name="tillbaka" size={16} />
+        Startsidan
       </Link>
       <h1 className="mt-2 font-display text-3xl font-semibold text-navy">Idéverkstad</h1>
       <WaveDivider className="mt-2 h-3 w-24" color="#5B4B9E" />

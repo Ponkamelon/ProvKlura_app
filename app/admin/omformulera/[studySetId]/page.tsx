@@ -12,6 +12,7 @@ import {
   revertToOriginalAction,
   updateVariantAction,
 } from "@/app/actions/rewording";
+import { Icon } from "@/components/Icon";
 
 // AI-omformuleringen körs i en Server Action från den här sidan.
 export const maxDuration = 60;
@@ -148,12 +149,14 @@ function VariantCard({
                 className="field-input py-2 text-sm"
               />
               <SubmitButton pendingText="Sparar…" className="btn-secondary px-4 py-2 text-sm">
+                <Icon name="spara" size={18} />
                 Spara
               </SubmitButton>
             </form>
           </details>
           <form action={dropVariantAction.bind(null, studySetId, variant.id)}>
-            <button type="submit" className="text-navy/50 underline">
+            <button type="submit" className="link-back text-navy/70">
+              <Icon name="dra-tillbaka" size={16} />
               Behåll originalet
             </button>
           </form>
@@ -231,8 +234,9 @@ export default async function RewordPage({
 
   return (
     <div>
-      <Link href={backHref} className="text-sm text-navy/60 underline">
-        ← Tillbaka
+      <Link href={backHref} className="link-back">
+        <Icon name="tillbaka" size={16} />
+        Tillbaka
       </Link>
       <h1 className="mt-2 font-display text-3xl font-semibold text-navy">Nya formuleringar</h1>
       <WaveDivider className="mt-2 h-3 w-24" color="#FF6B4A" />
@@ -272,6 +276,7 @@ export default async function RewordPage({
           {!draft && (
             <form action={generateRewordingAction.bind(null, studySet.id)}>
               <SubmitButton pendingText="Formulerar om… (upp till en minut)" className="btn-primary">
+                <Icon name="formulera-om" />
                 {active ? "Formulera om igen" : "Formulera om testet"}
               </SubmitButton>
             </form>

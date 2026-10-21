@@ -2,6 +2,7 @@ import Link from "next/link";
 import { WaveDivider } from "@/components/WaveDivider";
 import { requireProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { Icon } from "@/components/Icon";
 
 type StudySetListItem = {
   id: string;
@@ -39,7 +40,8 @@ export default async function ProvListPage({
           <WaveDivider className="mt-2 h-3 w-24" color="#FF6B4A" />
         </div>
         <Link href="/admin/prov/ny" className="btn-primary">
-          + Nytt pluggprojekt
+          <Icon name="lagg-till" />
+          Nytt pluggprojekt
         </Link>
       </div>
 

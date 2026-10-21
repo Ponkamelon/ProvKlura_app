@@ -16,6 +16,7 @@ import {
 import { SubmitButton } from "@/components/SubmitButton";
 import { ConfirmSubmitButton } from "@/components/ConfirmSubmitButton";
 import type { Tables } from "@/lib/database.types";
+import { Icon } from "@/components/Icon";
 
 // regenerateQuestionsAction (Försök igen) kör samma AI-anrop som kan ta
 // 15–40 sekunder — samma anledning som i admin/prov/ny/page.tsx.
@@ -92,8 +93,9 @@ export default async function StudySetReviewPage({
 
   return (
     <div>
-      <Link href="/admin/prov" className="text-sm text-navy/60 underline">
-        ← Pluggprojekt
+      <Link href="/admin/prov" className="link-back">
+        <Icon name="tillbaka" size={16} />
+        Pluggprojekt
       </Link>
       <div className="mt-2 flex flex-wrap items-start justify-between gap-4">
         <div>
@@ -109,9 +111,10 @@ export default async function StudySetReviewPage({
           <ConfirmSubmitButton
             message={`Är du säker på att du vill ta bort "${studySet.title}"?\n\nAlla frågor, tilldelningar och elevernas resultat försvinner. Det går inte att ångra.`}
             pendingText="Tar bort..."
-            className="text-xs text-navy/40 underline hover:text-coral"
+            className="btn-danger px-4 py-2 text-sm"
             title="Tar bort pluggprojektet och alla dess frågor, tilldelningar och elevförsök permanent"
           >
+            <Icon name="ta-bort" size={18} />
             Ta bort pluggprojekt
           </ConfirmSubmitButton>
         </form>
@@ -123,8 +126,9 @@ export default async function StudySetReviewPage({
         <span>· {questions?.length ?? 0} frågor skapade</span>
         <span>· {publishedCount} publicerade</span>
         {publishedCount > 0 && (
-          <Link href={`/admin/omformulera/${params.studySetId}`} className="text-ocean underline">
-            · Formulera om frågorna
+          <Link href={`/admin/omformulera/${params.studySetId}`} className="inline-flex items-center gap-1 font-medium text-ocean hover:underline">
+            <Icon name="formulera-om" size={16} />
+            Formulera om frågorna
           </Link>
         )}
       </div>
@@ -149,6 +153,7 @@ export default async function StudySetReviewPage({
               </label>
             ))}
             <button type="submit" className="btn-primary mt-2">
+              <Icon name="spara" />
               Spara tilldelning
             </button>
           </form>
@@ -199,6 +204,7 @@ export default async function StudySetReviewPage({
             className="mt-3"
           >
             <SubmitButton pendingText="Genererar frågor..." className="btn-primary">
+              <Icon name="generera-fragor" />
               Generera frågor
             </SubmitButton>
           </form>
@@ -208,6 +214,7 @@ export default async function StudySetReviewPage({
       {highConfidenceDrafts.length > 0 && (
         <form action={publishAllReviewedAction.bind(null, params.studySetId)} className="mt-4">
           <button type="submit" className="btn-primary">
+            <Icon name="godkann-alla" />
             Godkänn alla med hög säkerhet ({highConfidenceDrafts.length})
           </button>
         </form>
@@ -284,30 +291,37 @@ export default async function StudySetReviewPage({
                 </div>
               </div>
 
-              <div className="mt-3 flex flex-wrap gap-3 text-xs">
+              <div className="mt-3 flex flex-wrap justify-end gap-2">
                 <Link
                   href={`/admin/prov/${params.studySetId}/fraga/${q.id}`}
-                  className="text-ocean underline"
+                  className="icon-btn"
+                  aria-label="Redigera frågan"
+                  title="Redigera"
                 >
-                  Redigera
+                  <Icon name="redigera" />
                 </Link>
                 {q.status === "published" ? (
                   <form action={unpublishQuestionAction.bind(null, params.studySetId, q.id)}>
-                    <button type="submit" className="text-navy/50 underline">
-                      Dra tillbaka
+                    <button type="submit" className="icon-btn" aria-label="Dra tillbaka frågan" title="Dra tillbaka">
+                      <Icon name="dra-tillbaka" />
                     </button>
                   </form>
                 ) : (
                   <form action={publishQuestionAction.bind(null, params.studySetId, q.id)}>
-                    <button type="submit" className="text-ocean underline">
-                      Publicera
+                    <button type="submit" className="icon-btn" aria-label="Publicera frågan" title="Publicera">
+                      <Icon name="publicera" />
                     </button>
                   </form>
                 )}
                 <form action={deleteQuestionAction.bind(null, params.studySetId, q.id)}>
-                  <button type="submit" className="text-coral underline">
-                    Ta bort
-                  </button>
+                  <ConfirmSubmitButton
+                    message="Ta bort den här frågan? Det går inte att ångra."
+                    className="icon-btn icon-btn-danger"
+                    ariaLabel="Ta bort frågan"
+                    title="Ta bort"
+                  >
+                    <Icon name="ta-bort" />
+                  </ConfirmSubmitButton>
                 </form>
               </div>
             </div>

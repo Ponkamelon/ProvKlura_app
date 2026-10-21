@@ -14,6 +14,7 @@ import {
   requestNutidDraftAction,
   updateNutidClueAction,
 } from "@/app/actions/nutid";
+import { Icon } from "@/components/Icon";
 
 function weekLabel(k: NutidKryssRow) {
   return k.week_start ? `Vecka ${isoWeekNumber(k.week_start)}` : "Utan vecka";
@@ -34,11 +35,13 @@ function DraftCard({ kryss }: { kryss: NutidKryssRow }) {
         <div className="flex gap-2">
           <form action={rejectNutidAction.bind(null, kryss.id)}>
             <ConfirmSubmitButton message="Avvisa hela utkastet?" className="btn-secondary px-4 py-2 text-sm">
+              <Icon name="avbryt" size={18} />
               Avvisa
             </ConfirmSubmitButton>
           </form>
           <form action={publishNutidAction.bind(null, kryss.id)}>
             <SubmitButton pendingText="Publicerar…" className="btn-primary px-4 py-2 text-sm">
+              <Icon name="publicera" size={18} />
               Publicera
             </SubmitButton>
           </form>
@@ -95,7 +98,8 @@ function DraftCard({ kryss }: { kryss: NutidKryssRow }) {
                     maxLength={200}
                     className="field-input flex-1 py-2 text-sm"
                   />
-                  <SubmitButton pendingText="…" className="btn-secondary self-start px-3 py-2 text-xs">
+                  <SubmitButton pendingText="…" className="btn-secondary self-start gap-1 px-3 py-2 text-xs">
+                    <Icon name="spara" size={14} />
                     Spara
                   </SubmitButton>
                 </form>

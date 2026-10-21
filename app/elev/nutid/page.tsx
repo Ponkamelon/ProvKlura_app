@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentKryss } from "@/lib/nutid/current";
 import { computeProgress, type AttemptRow } from "@/lib/nutid/progress";
 import { currentWeekStart, isoWeekNumber } from "@/lib/nutid/week";
+import { Icon } from "@/components/Icon";
 
 type AttemptWithKryss = AttemptRow & { kryss_id: string };
 
@@ -47,8 +48,9 @@ export default async function NutidPage() {
 
   return (
     <div data-nutid>
-      <Link href="/elev" className="text-sm text-navy/60 underline">
-        ← Mina pluggprojekt
+      <Link href="/elev" className="link-back">
+        <Icon name="tillbaka" size={16} />
+        Mina pluggprojekt
       </Link>
       <h1 className="mt-2 font-display text-3xl font-semibold text-navy">Nutidskrysset</h1>
       <WaveDivider className="mt-2 h-3 w-24" color="#B4235A" />

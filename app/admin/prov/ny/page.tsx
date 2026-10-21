@@ -3,6 +3,7 @@ import { createStudySetAction } from "@/app/actions/studySets";
 import { requireProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { SubmitButton } from "@/components/SubmitButton";
+import { Icon } from "@/components/Icon";
 
 // AI-frågegenereringen (via createStudySetAction) tar ofta 15–40 sekunder.
 // Vercels standardtimeout (10s) är för kort — 60 är max på Hobby-planen.
@@ -42,7 +43,8 @@ export default async function NyttProvPage({
 
   return (
     <div className="mx-auto max-w-lg">
-      <Link href="/admin/prov" className="text-sm text-navy/50 underline">
+      <Link href="/admin/prov" className="link-back">
+        <Icon name="tillbaka" size={16} />
         Avbryt
       </Link>
       <h1 className="mt-2 font-display text-2xl font-semibold text-navy">

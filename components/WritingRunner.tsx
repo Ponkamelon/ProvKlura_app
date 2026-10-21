@@ -13,6 +13,7 @@ import {
   type WritingFeedback,
   type WritingResult,
 } from "@/lib/writing/types";
+import { Icon } from "@/components/Icon";
 
 type Screen =
   | { kind: "what" }
@@ -308,8 +309,9 @@ export function WritingRunner({
   return (
     <div data-skrivklura>
       <div className="flex items-center justify-between gap-3">
-        <Link href={hubHref} className="text-sm text-navy/60 underline">
-          ← Pausa
+        <Link href={hubHref} className="link-back">
+          <Icon name="pausa" size={16} />
+          Pausa
         </Link>
         <span className="skriv-badge">Skrivklura · {title}</span>
       </div>
@@ -474,6 +476,7 @@ export function WritingRunner({
             {level === "snabb" ? (
               <>
                 <Link href={hubHref} className="btn-primary mt-6 w-full">
+                  <Icon name="klar-for-idag" />
                   Klar för idag
                 </Link>
                 <Link
@@ -609,7 +612,8 @@ export function WritingRunner({
               )}
 
               {!showExample && (
-                <button type="button" onClick={showHint} className="skriv-stuck mt-3">
+                <button type="button" onClick={showHint} className="skriv-stuck mt-3 gap-2">
+                  <Icon name="jag-fastnar" size={18} />
                   {hintsShown === 0
                     ? "Jag fastnar"
                     : allHintsShown
@@ -623,6 +627,7 @@ export function WritingRunner({
                   <NextButton onClick={goNext}>Nästa</NextButton>
                 ) : (
                   <button type="button" onClick={goNext} className="btn-secondary mt-6 w-full">
+                    <Icon name="hoppa-over" />
                     Hoppa över
                   </button>
                 )}
@@ -657,11 +662,13 @@ export function WritingRunner({
               <>
                 <NextButton onClick={goNext}>Skriv som på provet</NextButton>
                 <Link href={hubHref} onClick={clearDraft} className="btn-secondary mt-3 w-full">
+                  <Icon name="klar-for-idag" />
                   Klar för idag
                 </Link>
               </>
             ) : (
               <Link href={hubHref} onClick={clearDraft} className="btn-primary mt-6 w-full">
+                <Icon name="klar-for-idag" />
                 Klar för idag
               </Link>
             )}
@@ -718,7 +725,8 @@ export function WritingRunner({
                 </div>
               )}
               {hintsShown < hints.length && (
-                <button type="button" onClick={showHint} className="skriv-stuck mt-3">
+                <button type="button" onClick={showHint} className="skriv-stuck mt-3 gap-2">
+                  <Icon name="jag-fastnar" size={18} />
                   {hintsShown === 0 ? "Jag fastnar" : "En fråga till"}
                 </button>
               )}
@@ -748,6 +756,7 @@ export function WritingRunner({
             onRevise={() => goTo("testWrite")}
           >
             <Link href={hubHref} onClick={clearDraft} className="btn-primary mt-6 w-full">
+              <Icon name="klar-for-idag" />
               Klar för idag
             </Link>
           </FeedbackView>
@@ -780,6 +789,7 @@ function NextButton({ children, onClick }: { children: React.ReactNode; onClick:
   return (
     <button type="button" onClick={onClick} className="btn-primary mt-6 w-full">
       {children}
+      <Icon name="nasta" />
     </button>
   );
 }
@@ -788,8 +798,9 @@ function NavRow({ children, onBack }: { children: React.ReactNode; onBack: () =>
   return (
     <>
       {children}
-      <button type="button" onClick={onBack} className="mt-3 w-full text-center text-sm text-navy/60 underline">
-        ← Tillbaka
+      <button type="button" onClick={onBack} className="link-back mt-3 w-full text-center justify-center">
+        <Icon name="tillbaka" size={16} />
+        Tillbaka
       </button>
     </>
   );

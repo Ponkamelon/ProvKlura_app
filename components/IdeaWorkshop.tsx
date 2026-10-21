@@ -3,6 +3,7 @@
 import { useRef, useState, useTransition } from "react";
 import { generateIdeaAction } from "@/app/actions/ideas";
 import { IDEA_GENRES, IDEA_LENGTHS, type IdeaLengthId } from "@/lib/ideas/genres";
+import { Icon } from "@/components/Icon";
 
 type Suggestion = { title: string; text: string; ideas: string[] };
 
@@ -147,9 +148,9 @@ export function IdeaWorkshop() {
                   onClick={() => setCurrent((c) => Math.max(0, c - 1))}
                   disabled={current === 0}
                   aria-label="Föregående förslag"
-                  className="skriv-chip px-3 py-1 disabled:opacity-40"
+                  className="skriv-chip inline-flex items-center px-3 py-1.5 disabled:opacity-40"
                 >
-                  ←
+                  <Icon name="tillbaka" size={16} />
                 </button>
                 <span className="font-mono text-navy/60">
                   {current + 1}/{suggestions.length}
@@ -159,9 +160,9 @@ export function IdeaWorkshop() {
                   onClick={() => setCurrent((c) => Math.min(suggestions.length - 1, c + 1))}
                   disabled={current === suggestions.length - 1}
                   aria-label="Nästa förslag"
-                  className="skriv-chip px-3 py-1 disabled:opacity-40"
+                  className="skriv-chip inline-flex items-center px-3 py-1.5 disabled:opacity-40"
                 >
-                  →
+                  <Icon name="nasta" size={16} />
                 </button>
               </div>
             )}

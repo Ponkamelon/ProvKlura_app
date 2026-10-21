@@ -13,12 +13,14 @@ export function ConfirmSubmitButton({
   pendingText,
   className,
   title,
+  ariaLabel,
 }: {
   children: React.ReactNode;
   message: string;
   pendingText?: string;
   className?: string;
   title?: string;
+  ariaLabel?: string;
 }) {
   const { pending } = useFormStatus();
 
@@ -27,6 +29,7 @@ export function ConfirmSubmitButton({
       type="submit"
       disabled={pending}
       title={title}
+      aria-label={ariaLabel}
       className={`${className ?? ""} disabled:opacity-60`}
       onClick={(e) => {
         if (!window.confirm(message)) e.preventDefault();

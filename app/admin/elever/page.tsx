@@ -7,6 +7,8 @@ import {
 } from "@/app/actions/students";
 import { requireProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { Icon } from "@/components/Icon";
+import { ConfirmSubmitButton } from "@/components/ConfirmSubmitButton";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
 
@@ -66,7 +68,8 @@ export default async function EleverPage({
           <WaveDivider className="mt-2 h-3 w-24" color="#FF6B4A" />
         </div>
         <Link href="/admin/elever/ny" className="btn-primary">
-          + Lägg till elev
+          <Icon name="lagg-till-elev" />
+          Lägg till elev
         </Link>
       </div>
 
@@ -138,17 +141,22 @@ export default async function EleverPage({
                       Aktiv
                     </span>
                     <form action={deleteStudentAction.bind(null, student.id as string)}>
-                      <button
-                        type="submit"
-                        className="text-xs text-navy/40 underline hover:text-coral"
+                      <ConfirmSubmitButton
+                        message={
+                          guardianCount > 1
+                            ? `Sluta hantera ${student.display_name as string}? Kontot och den andra förälderns koppling finns kvar.`
+                            : `Ta bort ${student.display_name as string}? Elevens konto och alla resultat raderas permanent. Det går inte att ångra.`
+                        }
+                        className="icon-btn icon-btn-danger"
+                        ariaLabel={guardianCount > 1 ? `Sluta hantera ${student.display_name as string}` : `Ta bort ${student.display_name as string}`}
                         title={
                           guardianCount > 1
                             ? "Slutar hantera eleven — kontot och den andra förälderns koppling finns kvar"
                             : "Raderar elevens konto och alla resultat permanent"
                         }
                       >
-                        {guardianCount > 1 ? "Sluta hantera" : "Ta bort"}
-                      </button>
+                        <Icon name={guardianCount > 1 ? "logga-ut" : "ta-bort"} />
+                      </ConfirmSubmitButton>
                     </form>
                   </div>
                 </div>
@@ -175,8 +183,9 @@ export default async function EleverPage({
                   <form action={cancelInvitationAction.bind(null, invitation.id)}>
                     <button
                       type="submit"
-                      className="text-xs text-navy/40 underline hover:text-coral"
+                      className="link-back text-xs text-navy/60 hover:text-coral-dark"
                     >
+                      <Icon name="avbryt" size={14} />
                       Avbryt
                     </button>
                   </form>

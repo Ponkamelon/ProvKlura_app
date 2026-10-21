@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getSubjectVisual } from "@/lib/subjectVisuals";
 import { UpdatedBadge } from "@/components/UpdatedBadge";
 import { getUpdatedStudySetIds } from "@/lib/quiz/variants";
+import { Icon } from "@/components/Icon";
 
 type StudySetRow = {
   id: string;
@@ -99,8 +100,9 @@ export default async function NationellaProvPage() {
 
   return (
     <div>
-      <Link href="/elev" className="text-sm text-navy/50 underline">
-        ← Mina pluggprojekt
+      <Link href="/elev" className="link-back">
+        <Icon name="tillbaka" size={16} />
+        Mina pluggprojekt
       </Link>
       <h1 className="mt-2 font-display text-3xl font-semibold text-navy">
         Nationella prov

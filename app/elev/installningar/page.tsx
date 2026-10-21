@@ -2,6 +2,7 @@ import Link from "next/link";
 import { requireProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { updateOwnFeedbackTimingAction } from "@/app/actions/studentSettings";
+import { Icon } from "@/components/Icon";
 
 export default async function ElevInstallningarPage({
   searchParams,
@@ -19,8 +20,9 @@ export default async function ElevInstallningarPage({
 
   return (
     <div>
-      <Link href="/elev" className="text-sm text-navy/50 underline">
-        ← Tillbaka
+      <Link href="/elev" className="link-back">
+        <Icon name="tillbaka" size={16} />
+        Tillbaka
       </Link>
       <h1 className="mt-2 font-display text-2xl font-semibold text-navy">
         Inställningar
@@ -78,6 +80,7 @@ export default async function ElevInstallningarPage({
         </div>
 
         <button type="submit" className="btn-primary w-full">
+          <Icon name="spara" />
           Spara
         </button>
       </form>

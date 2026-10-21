@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { OwlMark } from "@/components/OwlMark";
 import { WaveDivider } from "@/components/WaveDivider";
+import { Icon } from "@/components/Icon";
 
 export default async function HomePage() {
   const supabase = createClient();
@@ -37,9 +38,11 @@ export default async function HomePage() {
           Kom igång som förälder/lärare
         </Link>
         <Link href="/logga-in" className="btn-secondary justify-center">
+          <Icon name="logga-in" />
           Logga in
         </Link>
         <Link href="/faq" className="btn-tertiary justify-center">
+          <Icon name="vanliga-fragor" />
           Vanliga frågor
         </Link>
       </div>

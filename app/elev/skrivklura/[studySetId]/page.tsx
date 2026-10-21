@@ -8,6 +8,7 @@ import {
   parseWritingContent,
   type WritingResult,
 } from "@/lib/writing/types";
+import { Icon } from "@/components/Icon";
 
 type SubmissionRow = {
   mode: "trana" | "gor_sjalv" | "testa";
@@ -50,8 +51,9 @@ export default async function SkrivkluraSetPage({
   if (!studySet || !content) {
     return (
       <div data-skrivklura>
-        <Link href="/elev/skrivklura" className="text-sm text-navy/60 underline">
-          ← Skrivklura
+        <Link href="/elev/skrivklura" className="link-back">
+          <Icon name="tillbaka" size={16} />
+          Skrivklura
         </Link>
         <div className="skriv-card mt-6 p-8 text-center">
           <p className="text-navy/70">Hittade inte skrivövningen.</p>
@@ -75,8 +77,9 @@ export default async function SkrivkluraSetPage({
 
   return (
     <div data-skrivklura>
-      <Link href="/elev/skrivklura" className="text-sm text-navy/60 underline">
-        ← Skrivklura
+      <Link href="/elev/skrivklura" className="link-back">
+        <Icon name="tillbaka" size={16} />
+        Skrivklura
       </Link>
       <h1 className="mt-2 font-display text-3xl font-semibold text-navy">{studySet.title}</h1>
       <WaveDivider className="mt-2 h-3 w-24" color="#5B4B9E" />
