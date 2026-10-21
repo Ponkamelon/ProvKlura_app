@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { OwlMark } from "@/components/OwlMark";
 import { WaveDivider } from "@/components/WaveDivider";
 import { Icon } from "@/components/Icon";
+import { ShareAppButton } from "@/components/ShareAppButton";
 
 export default async function HomePage() {
   const supabase = createClient();
@@ -45,6 +46,9 @@ export default async function HomePage() {
           <Icon name="vanliga-fragor" />
           Vanliga frågor
         </Link>
+      </div>
+      <div className="mt-6">
+        <ShareAppButton variant="link" label="Tipsa en vän om ProvKlura" />
       </div>
     </main>
   );

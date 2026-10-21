@@ -3,6 +3,7 @@ import { WaveDivider } from "@/components/WaveDivider";
 import { requireProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { Icon } from "@/components/Icon";
+import { ShareAppButton } from "@/components/ShareAppButton";
 
 export default async function AdminDashboard() {
   const profile = await requireProfile("admin");
@@ -98,6 +99,12 @@ export default async function AdminDashboard() {
             </span>
           </Link>
         )}
+
+        <div className="notebook-card flex flex-col items-center justify-center gap-2 p-6 text-center">
+          <p className="font-semibold text-navy">Känner du fler föräldrar?</p>
+          <p className="text-xs text-navy/60">Tipsa dem om ProvKlura</p>
+          <ShareAppButton />
+        </div>
       </div>
     </div>
   );
