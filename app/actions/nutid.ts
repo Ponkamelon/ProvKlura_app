@@ -4,20 +4,18 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { layoutCrossword, normalizeAnswer } from "@/lib/nutid/layout";
 import { currentWeekStart } from "@/lib/nutid/week";
-import type { NutidEntry } from "@/lib/nutid/types";
+import { MIN_QUESTIONS, type NutidQuestion } from "@/lib/nutid/types";
 
 /* ───────────── Elev ───────────── */
 
 /**
- * Sparar hur långt eleven kommit i ett kryss. Anropas efter varje löst ord
- * så att halvlösta kryss också räknas i veckoremsan.
+ * Sparar elevens svar efter varje fråga, så att ett halvgjort kryss
+ * finns kvar och syns i veckoremsan. Rättningen görs här mot facit.
  */
-export async function saveNutidProgressAction(params: {
+export async function saveNutidAnswersAction(params: {
   kryssId: string;
-  solved: string[];
-  hintsUsed: number;
+  answers: (number | null)[];
 }): Promise<{ ok: boolean }> {
   const profile = await requireProfile("student");
   const supabase = createClient();
@@ -30,11 +28,13 @@ export async function saveNutidProgressAction(params: {
     .maybeSingle();
   if (!kryss) return { ok: false };
 
-  const answers = new Set(((kryss.entries ?? []) as NutidEntry[]).map((e) => e.answer));
-  const solved = [...new Set(params.solved.map(normalizeAnswer))].filter((a) => answers.has(a));
-  const total = answers.size;
-  const completed = total > 0 && solved.length === total;
-  const hints = Math.max(0, Math.min(200, Math.floor(params.hintsUsed) || 0));
+  const questions = (kryss.entries ?? []) as NutidQuestion[];
+  const answers = questions.map((_, i) => {
+    const a = params.answers[i];
+    return a === 0 || a === 1 || a === 2 ? a : null;
+  });
+  const correct = answers.filter((a, i) => a !== null && a === questions[i].correct).length;
+  const completed = questions.length > 0 && answers.every((a) => a !== null);
 
   const { data: existing } = await supabase
     .from("nutidskryss_attempts")
@@ -43,12 +43,14 @@ export async function saveNutidProgressAction(params: {
     .eq("kryss_id", kryss.id)
     .maybeSingle();
 
+  // Ett inlämnat kryss ändras inte i efterhand (som på en kupong).
+  if (existing?.completed_at) return { ok: true };
+
   const values = {
-    solved,
-    solved_count: solved.length,
-    total,
-    hints_used: hints,
-    completed_at: completed ? (existing?.completed_at ?? new Date().toISOString()) : null,
+    answers,
+    solved_count: correct,
+    total: questions.length,
+    completed_at: completed ? new Date().toISOString() : null,
     updated_at: new Date().toISOString(),
   };
 
@@ -88,6 +90,12 @@ function done(message?: string): never {
   redirect(message ? `/admin/nutidskryss?meddelande=${encodeURIComponent(message)}` : "/admin/nutidskryss");
 }
 
+async function loadEntries(supabase: ReturnType<typeof createClient>, kryssId: string) {
+  const { data } = await supabase.from("nutidskryss").select("entries").eq("id", kryssId).maybeSingle();
+  if (!data) done("Hittade inte krysset.");
+  return (data.entries ?? []) as NutidQuestion[];
+}
+
 export async function requestNutidDraftAction() {
   const { supabase } = await requireEditor();
   const { error } = await supabase.rpc("request_nutidskryss_generation");
@@ -107,7 +115,9 @@ export async function publishNutidAction(kryssId: string) {
     .eq("id", kryssId)
     .maybeSingle();
   if (!kryss || kryss.status !== "draft") done("Hittade inget utkast att publicera.");
-  if (((kryss.entries ?? []) as NutidEntry[]).length < 4) done("Krysset behöver minst fyra ord.");
+  if (((kryss.entries ?? []) as NutidQuestion[]).length < MIN_QUESTIONS) {
+    done(`Krysset behöver minst ${MIN_QUESTIONS} frågor.`);
+  }
 
   // Bara ett nyhetskryss per vecka: ett tidigare publicerat blir utkast igen.
   await supabase
@@ -133,38 +143,37 @@ export async function rejectNutidAction(kryssId: string) {
     .update({ status: "rejected", reviewed_by: profile.id, published_at: null })
     .eq("id", kryssId)
     .eq("is_evergreen", false);
-  done("Utkastet är avvisat. Eleverna får ett reservkryss tills ett nytt publiceras.");
+  done("Krysset är avvisat. Eleverna får ett reservkryss tills ett nytt publiceras.");
 }
 
-export async function updateNutidClueAction(kryssId: string, answer: string, formData: FormData) {
+export async function updateNutidQuestionAction(kryssId: string, index: number, formData: FormData) {
   const { supabase } = await requireEditor();
-  const clue = String(formData.get("clue") ?? "").trim().slice(0, 200);
-  if (!clue) done("Ledtråden kan inte vara tom.");
-  if (clue.toUpperCase().includes(answer)) done(`Ledtråden avslöjar svaret ${answer}.`);
+  const entries = await loadEntries(supabase, kryssId);
+  const current = entries[index];
+  if (!current) done("Hittade inte frågan.");
 
-  const { data: kryss } = await supabase.from("nutidskryss").select("entries").eq("id", kryssId).maybeSingle();
-  if (!kryss) done("Hittade inte krysset.");
+  const question = String(formData.get("question") ?? "").trim().slice(0, 300);
+  const options = [0, 1, 2].map((i) => String(formData.get(`option_${i}`) ?? "").trim().slice(0, 150));
+  const correct = Number(formData.get("correct"));
+  const explanation = String(formData.get("explanation") ?? "").trim().slice(0, 300);
 
-  const entries = ((kryss.entries ?? []) as NutidEntry[]).map((e) => (e.answer === answer ? { ...e, clue } : e));
+  if (question.length < 5) done("Frågan behöver minst några ord.");
+  if (options.some((o) => !o)) done("Alla tre alternativen måste ha text.");
+  if (new Set(options.map((o) => o.toLowerCase())).size !== 3) done("Två alternativ blev likadana.");
+  if (![0, 1, 2].includes(correct)) done("Välj vilket alternativ som är rätt.");
+
+  entries[index] = { ...current, question, options, correct, explanation };
   const { error } = await supabase.from("nutidskryss").update({ entries }).eq("id", kryssId);
-  done(error ? `Kunde inte spara: ${error.message}` : "Ledtråden är sparad.");
+  done(error ? `Kunde inte spara: ${error.message}` : `Fråga ${index + 1} är sparad.`);
 }
 
-export async function removeNutidEntryAction(kryssId: string, answer: string) {
+export async function removeNutidQuestionAction(kryssId: string, index: number) {
   const { supabase } = await requireEditor();
-  const { data: kryss } = await supabase.from("nutidskryss").select("entries").eq("id", kryssId).maybeSingle();
-  if (!kryss) done("Hittade inte krysset.");
-
-  const remaining = ((kryss.entries ?? []) as NutidEntry[]).filter((e) => e.answer !== answer);
-  if (remaining.length < 4) done("Krysset behöver minst fyra ord. Avvisa hellre hela utkastet.");
-
-  // Lägg ut krysset på nytt utan ordet. Hänger inte resten ihop längre
-  // tas ordet inte bort — då skulle andra ord försvinna utan att det syns.
-  const layout = layoutCrossword(remaining.map((e) => e.answer));
-  if (layout.placements.length < remaining.length) {
-    done(`${answer} håller ihop krysset och kan inte tas bort. Ändra ledtråden istället, eller avvisa utkastet.`);
+  const entries = await loadEntries(supabase, kryssId);
+  if (entries.length - 1 < MIN_QUESTIONS) {
+    done(`Krysset behöver minst ${MIN_QUESTIONS} frågor. Ändra frågan istället, eller avvisa utkastet.`);
   }
-
-  const { error } = await supabase.from("nutidskryss").update({ entries: remaining, layout }).eq("id", kryssId);
-  done(error ? `Kunde inte ta bort: ${error.message}` : `${answer} är borttaget.`);
+  const remaining = entries.filter((_, i) => i !== index);
+  const { error } = await supabase.from("nutidskryss").update({ entries: remaining }).eq("id", kryssId);
+  done(error ? `Kunde inte ta bort: ${error.message}` : `Fråga ${index + 1} är borttagen.`);
 }

@@ -1,4 +1,5 @@
-// Nutidskrysset — skapar veckans utkast från nyhetsflöden.
+// Nutidskrysset — skapar veckans utkast från nyhetsflöden: tio frågor med
+// tre svarsalternativ (1, X, 2), som "nutidskrysset" i skolan.
 //
 // Körs varje måndag av pg_cron (public.nutid_trigger_generation) och när
 // en redaktör trycker "Skapa nytt utkast nu". Resultatet sparas ALLTID som
@@ -8,12 +9,8 @@
 // Regler för innehållet:
 // - Bara etablerade nyhetsredaktioner (SOURCES nedan), ingen alternativmedia.
 // - En nyhet får bara användas om den finns hos minst två olika källor.
-// - Svaren är begrepp ur skolans kunskapsbank; nyheten är bara ledtråden.
+// - Rätt svar måste gå att hitta i rubrikerna frågan bygger på.
 // - Tunga ämnen (krig, våld, brott, död, olyckor) och partipolitik spärras.
-//
-// layout.ts är en kopia av lib/nutid/layout.ts i appen.
-
-import { layoutCrossword, normalizeAnswer } from "./layout.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -55,15 +52,19 @@ const BLOCKED = /\b(krig|krigs|döda|dödad|dödade|dödats|död|döds|dödsfall
 
 type Headline = { id: number; source: string; title: string; description: string; url: string };
 
-type Entry = {
-  /** Rubrik-id:n ordet bygger på (används bara internt för att sprida orden över nyheter). */
+type Question = {
+  /** Rubrik-id:n frågan bygger på (bara internt, för att sprida frågorna över nyheter). */
   headlineIds?: number[];
-  answer: string;
-  clue: string;
-  concept: string;
+  question: string;
+  options: string[];
+  correct: number;
+  explanation: string;
   subject: string;
   sources: { source: string; title: string; url: string }[];
 };
+
+const TARGET = 10;
+const MIN_QUESTIONS = 6;
 
 const STOPWORDS = new Set([
   "efter", "under", "inför", "kommer", "säger", "sedan", "kunde", "skulle", "många", "andra", "första",
@@ -182,14 +183,24 @@ function significantWords(text: string) {
   );
 }
 
-/** Står svaret (eller dess stam) i någon av rubrikerna? Annars är kopplingen påhittad. */
-function answerAppearsInHeadlines(answer: string, concept: string, cited: Headline[]) {
+/**
+ * Går rätt svar att hitta i nyheterna? Minst två ordstammar ur frågan och
+ * det rätta alternativet ska stå i rubrikerna, och alla tal i det rätta
+ * alternativet måste finnas där. Annars kan AI:n ha hittat på.
+ */
+function supportedByHeadlines(question: string, correctOption: string, cited: Headline[]) {
   const text = cited.map((h) => `${h.title} ${h.description}`).join(" ").toLowerCase();
-  const stems = [answer, ...concept.split(/\s+/)]
-    .map((w) => w.toLowerCase().replace(/[^a-zåäöéü]/g, ""))
-    .filter((w) => w.length >= 2)
-    .map((w) => (w.length > 6 ? w.slice(0, Math.max(5, w.length - 3)) : w.slice(0, Math.max(3, w.length - 1))));
-  return stems.some((stem) => text.includes(stem));
+  const numbers = correctOption.match(/\d+(?:[.,]\d+)?/g) ?? [];
+  if (numbers.some((n) => !text.includes(n))) return false;
+  const stems = [...new Set(
+    `${question} ${correctOption}`
+      .toLowerCase()
+      .split(/[^a-zåäöéü]+/)
+      .filter((w) => w.length >= 4 && !STOPWORDS.has(w))
+      .map((w) => w.slice(0, Math.max(4, Math.min(6, w.length - 1)))),
+  )];
+  const hits = stems.filter((stem) => text.includes(stem)).length;
+  return hits >= 2;
 }
 
 /** Minst två olika källor, och rubrikerna från olika källor måste dela ett ord — så AI:n inte parar ihop olika nyheter. */
@@ -208,26 +219,27 @@ function confirmedByTwoSources(cited: Headline[]) {
   return false;
 }
 
-const SYSTEM_PROMPT = `Du gör "Veckans nutidskryss" i ProvKlura, en studieapp för elever i årskurs 7–9. Många elever har svårt med koncentration och låg självkänsla. Krysset ska kännas lugnt, begripligt och lite roligt.
+const SYSTEM_PROMPT = `Du gör "Nutidskrysset" i ProvKlura, en studieapp för elever i årskurs 7–9. Det är som nutidskrysset i skolan: frågor om veckans nyheter med tre svarsalternativ, 1, X och 2. Många elever har svårt med koncentration och låg självkänsla, så frågorna ska vara tydliga, korta och gå att svara på för den som har följt nyheterna lite grann.
 
 Du får veckans nyhetsrubriker från svenska nyhetsredaktioner, numrerade [id] och märkta med källa.
 
-Uppgift: föreslå 12 ord till ett korsord (vi väljer sedan ut de som passar ihop).
-- Utgå från NYHETERNA, inte från begreppslistan: hitta en nyhet som flera källor skriver om, och välj ett ord som faktiskt står i rubrikerna och som är ett begrepp eleven kan ha nytta av i skolan (t.ex. "klimatmål" → KLIMAT, "räntan sänks" → RÄNTA, "elpriset" → ELPRIS). Ordet (eller dess stam) MÅSTE stå i minst en av rubrikerna du anger — annars underkänns det.
-- Hitta aldrig på en koppling. Passar inget skolbegrepp naturligt till en nyhet: hoppa över den nyheten.
-- Svaret ska vara ETT ord, 3–12 bokstäver, med korrekt svensk stavning inklusive å, ä, ö. Landsnamn, personnamn och partinamn är INTE tillåtna som svar.
-- Ledtråden kopplar begreppet till en nyhet från veckan, skriven med egna ord på enkel svenska. Max 18 ord. Den får INTE innehålla svaret, inte en böjning av det och inte ett sammansatt ord med svaret i (är svaret RÄNTA får ledtråden inte innehålla "räntan" eller "styrräntan").
-- Varje ord ska bygga på en nyhet som finns hos MINST TVÅ OLIKA källor. Ange id:n för rubrikerna i "rubriker" — minst två id från olika källor som handlar om SAMMA händelse. Ta med alla rubriker du hittar om händelsen, gärna 3–4.
-- "amne": skolämnet begreppet hör till (Samhällskunskap, Geografi, Historia, Biologi, Fysik, Kemi, Teknik).
-- Sprid orden över OLIKA nyheter: högst två ord per nyhet. Ett kryss om bara en händelse blir tråkigt.
-- Välj gärna ord som delar bokstäver med varandra, så de går att korsa.
+Uppgift: skriv 12 frågor (vi väljer sedan ut tio).
+- Varje fråga handlar om EN nyhet som finns hos MINST TVÅ OLIKA källor. Ange id:n för rubrikerna i "rubriker" — minst två id från olika källor om samma händelse, gärna 3–4.
+- Det rätta svaret måste gå att utläsa direkt ur rubrikerna du anger. Hitta aldrig på siffror, namn eller detaljer som inte står där. Siffror i rätt svar måste stå i rubrikerna.
+- Frågan: max 20 ord, enkel svenska, en sak i taget. Förklara kort sammanhanget i frågan om det behövs ("FN har släppt en klimatrapport. Hur många graders uppvärmning varnar den för?").
+- Tre alternativ, korta (max 8 ord), ungefär lika långa. Ett rätt. De två fel ska vara rimliga men tydligt fel för den som läst nyheten — inga lurfrågor, inget "alla stämmer".
+- "forklaring": en mening om nyheten, som eleven ser efter att ha svarat (max 25 ord).
+- "amne": skolämnet frågan hör till (Samhällskunskap, Geografi, Historia, Biologi, Fysik, Kemi, Teknik, Idrott).
+- Sprid frågorna över OLIKA nyheter: högst två frågor per nyhet.
+- Koppla gärna till ett skolbegrepp (t.ex. inflation, riksdag, klimat, export), men det är inget krav.
 
-Välj ALDRIG nyheter om: krig, väpnade konflikter, terror, våld, brott, olyckor, död, självmord, sjukdomsutbrott med döda, sex, droger, eller nyheter som handlar om en namngiven person (politiker, kändisar) eller ett parti. Nämn aldrig personnamn i ledtråden. Inga värderande eller politiskt vinklade ledtrådar — beskriv bara vad som hänt. Hellre ekonomi, väder och klimat, natur, vetenskap, rymden, teknik, sport, kultur och hur samhället fungerar.
+Välj ALDRIG nyheter om: krig, väpnade konflikter, terror, våld, brott, olyckor, död, självmord, sjukdomsutbrott med döda, sex, droger, eller nyheter som handlar om en namngiven person (politiker, kändisar) eller ett parti. Nämn aldrig personnamn. Inga värderande eller politiskt vinklade frågor — fråga bara om vad som hänt. Hellre ekonomi, väder och klimat, natur, vetenskap, rymden, teknik, sport, kultur och hur samhället fungerar.
 
-Exempel på bra skolbegrepp (inspiration, inget krav): ${CONCEPTS.join(", ")}.
+Exempel på bra skolbegrepp (inspiration): ${CONCEPTS.join(", ")}.
 
 Svara ENDAST med giltig JSON utan markdown:
-{"ord": [{"svar": "INFLATION", "ledtrad": "...", "begrepp": "inflation", "amne": "Samhällskunskap", "rubriker": [3, 41]}]}`;
+{"fragor": [{"fraga": "...", "alternativ": ["...", "...", "..."], "ratt": 0, "forklaring": "...", "amne": "Samhällskunskap", "rubriker": [3, 41]}]}
+"ratt" är index för rätt alternativ (0, 1 eller 2).`;
 
 let workingModel: string | null = null;
 
@@ -242,7 +254,7 @@ async function callModel(model: string, list: string, feedback: string) {
     },
     body: JSON.stringify({
       model,
-      max_tokens: 3500,
+      max_tokens: 4500,
       system: SYSTEM_PROMPT,
       messages: [{ role: "user", content: `Veckans rubriker:\n${list}${feedback ? `\n\n${feedback}` : ""}` }],
     }),
@@ -273,42 +285,49 @@ async function askClaude(headlines: Headline[], feedback: string) {
   const last = text.lastIndexOf("}");
   if (first === -1 || last <= first) throw new Error("AI-svaret innehöll ingen JSON");
   return JSON.parse(text.slice(first, last + 1)) as {
-    ord?: { svar?: string; ledtrad?: string; begrepp?: string; amne?: string; rubriker?: number[] }[];
+    fragor?: { fraga?: string; alternativ?: unknown[]; ratt?: unknown; forklaring?: string; amne?: string; rubriker?: number[] }[];
   };
+}
+
+/** Blandar alternativen så att rätt svar inte alltid hamnar på 1. */
+function shuffleOptions(options: string[], correct: number) {
+  const order = [0, 1, 2].sort(() => Math.random() - 0.5);
+  return { options: order.map((i) => options[i]), correct: order.indexOf(correct) };
 }
 
 function validate(raw: Awaited<ReturnType<typeof askClaude>>, headlines: Headline[]) {
   const byId = new Map(headlines.map((h) => [h.id, h]));
-  const entries: Entry[] = [];
+  const questions: Question[] = [];
   const rejected: string[] = [];
-  const seen = new Set<string>();
-  for (const o of raw.ord ?? []) {
-    const answer = normalizeAnswer(String(o.svar ?? ""));
-    const clue = String(o.ledtrad ?? "").trim();
-    const label = answer || String(o.svar ?? "?");
-    if (answer.length < 3 || answer.length > 12) { rejected.push(`${label}: fel längd`); continue; }
-    if (seen.has(answer)) { rejected.push(`${label}: dubblett`); continue; }
-    if (!clue || clue.split(/\s+/).length > 22) { rejected.push(`${label}: ledtråd saknas eller för lång`); continue; }
-    if (clue.toUpperCase().includes(answer.slice(0, Math.max(4, answer.length - 2)))) { rejected.push(`${label}: ledtråden avslöjar svaret`); continue; }
+  for (const [n, o] of (raw.fragor ?? []).entries()) {
+    const question = String(o.fraga ?? "").trim();
+    const label = `Fråga ${n + 1} (${question.slice(0, 40)}…)`;
+    const options = Array.isArray(o.alternativ) ? o.alternativ.map((x) => String(x ?? "").trim()) : [];
+    const rawCorrect = typeof o.ratt === "string" ? ({ "1": 0, X: 1, x: 1, "2": 2 } as Record<string, number>)[o.ratt] ?? Number(o.ratt) : Number(o.ratt);
+    if (question.length < 8 || question.split(/\s+/).length > 30) { rejected.push(`${label}: frågan saknas eller är för lång`); continue; }
+    if (options.length !== 3 || options.some((x) => !x || x.length > 120)) { rejected.push(`${label}: inte tre korta alternativ`); continue; }
+    if (new Set(options.map((x) => x.toLowerCase())).size !== 3) { rejected.push(`${label}: två alternativ är likadana`); continue; }
+    if (![0, 1, 2].includes(rawCorrect)) { rejected.push(`${label}: rätt svar saknas`); continue; }
     const cited = [...new Set(o.rubriker ?? [])].map((id) => byId.get(Number(id))).filter((h): h is Headline => !!h);
     if (!confirmedByTwoSources(cited)) { rejected.push(`${label}: inte bekräftad av två källor`); continue; }
-    if (!answerAppearsInHeadlines(answer, String(o.begrepp ?? ""), cited)) {
-      rejected.push(`${label}: ordet finns inte i nyheterna det sägs bygga på`);
+    if (!supportedByHeadlines(question, options[rawCorrect], cited)) {
+      rejected.push(`${label}: rätt svar går inte att hitta i nyheterna`);
       continue;
     }
-    const haystack = `${answer} ${clue} ${o.begrepp ?? ""} ${cited.map((h) => `${h.title} ${h.description}`).join(" ")}`;
+    const haystack = `${question} ${options.join(" ")} ${o.forklaring ?? ""} ${cited.map((h) => `${h.title} ${h.description}`).join(" ")}`;
     if (BLOCKED.test(haystack)) { rejected.push(`${label}: spärrat ämne`); continue; }
-    seen.add(answer);
-    entries.push({
+    const shuffled = shuffleOptions(options, rawCorrect);
+    questions.push({
       headlineIds: cited.map((h) => h.id),
-      answer,
-      clue,
-      concept: String(o.begrepp ?? answer.toLowerCase()).slice(0, 60),
+      question: question.slice(0, 300),
+      options: shuffled.options,
+      correct: shuffled.correct,
+      explanation: String(o.forklaring ?? "").trim().slice(0, 300),
       subject: String(o.amne ?? "Samhällskunskap").slice(0, 40),
       sources: cited.map((h) => ({ source: h.source, title: h.title.slice(0, 200), url: h.url })),
     });
   }
-  return { entries, rejected };
+  return { questions, rejected };
 }
 
 Deno.serve(async (req) => {
@@ -334,7 +353,7 @@ Deno.serve(async (req) => {
     return json({ skipped: "redan publicerat för veckan", weekStart });
   }
 
-  const title = `Veckans nutidskryss · vecka ${week}`;
+  const title = `Nutidskrysset · vecka ${week}`;
 
   const fail = async (error: string) => {
     const row = await insertKryss({ week_start: weekStart, status: "failed", title, error, entries: [] });
@@ -355,57 +374,46 @@ Deno.serve(async (req) => {
   );
 
   try {
-    let best: { entries: Entry[]; layout: ReturnType<typeof layoutCrossword> } | null = null;
-    let feedback = "";
+    const accepted: Question[] = [];
+    // Frågor som bara föll på "högst två per nyhet" — används om krysset annars blir för kort.
+    const overflow: Question[] = [];
     let lastRejected: string[] = [];
-    // Godkända ord sparas mellan rundorna, så runda två bygger vidare på
-    // det som redan klarat kontrollerna istället för att börja om.
-    const accepted: Entry[] = [];
-    // Ord som bara föll på "högst två per nyhet" — används om krysset annars blir för litet.
-    const overflow: Entry[] = [];
+    let feedback = "";
     const startedAt = Date.now();
+    const sameText = (a: Question, b: Question) => a.question.toLowerCase() === b.question.toLowerCase();
+
     for (let round = 0; round < 3; round++) {
       // Edge-funktioner har en tidsgräns; starta ingen ny runda efter 80 sekunder.
       if (round > 0 && Date.now() - startedAt > 80_000) break;
       const raw = await askClaude(headlines, feedback);
-      const { entries: fresh, rejected } = validate(raw, headlines);
-      for (const e of fresh) {
-        if (accepted.some((a) => a.answer === e.answer)) continue;
-        // Högst två ord per nyhet: räkna godkända ord som delar någon rubrik med det här.
-        const sameStory = accepted.filter((a) => a.headlineIds?.some((id) => e.headlineIds?.includes(id))).length;
+      const { questions: fresh, rejected } = validate(raw, headlines);
+      for (const q of fresh) {
+        if (accepted.length >= TARGET) break;
+        if (accepted.some((a) => sameText(a, q))) continue;
+        const sameStory = accepted.filter((a) => a.headlineIds?.some((id) => q.headlineIds?.includes(id))).length;
         if (sameStory >= 2) {
-          rejected.push(`${e.answer}: samma nyhet används redan av två ord`);
-          if (!overflow.some((o) => o.answer === e.answer)) overflow.push(e);
+          rejected.push(`${q.question.slice(0, 40)}…: samma nyhet har redan två frågor`);
+          if (!overflow.some((o) => sameText(o, q))) overflow.push(q);
           continue;
         }
-        accepted.push(e);
+        accepted.push(q);
       }
-      const entries = accepted;
       lastRejected = rejected;
-      console.log("nutidskryss runda", round + 1, "godkända:", entries.map((e) => e.answer), "underkända:", rejected);
-      const layout = layoutCrossword(entries.map((e) => e.answer));
-      const placed = layout.placements.map((p) => entries[p.index]);
-      const finalLayout = layoutCrossword(placed.map((e) => e.answer));
-      if (!best || placed.length > best.entries.length) best = { entries: placed, layout: finalLayout };
-      if (placed.length >= 5) break;
-      feedback = `Förra försöket gav bara ${placed.length} användbara ord (minst 5 behövs). Underkända: ${rejected.join("; ") || "inga"}. Ord som inte gick att korsa: ${entries.filter((_, i) => !layout.placements.some((p) => p.index === i)).map((e) => e.answer).join(", ") || "inga"}. Behåll inte de godkända orden (${entries.map((e) => e.answer).join(", ") || "inga"}) — föreslå 12 NYA ord som delar bokstäver med dem.`;
+      console.log("nutidskryss runda", round + 1, "godkända:", accepted.length, "underkända:", rejected);
+      if (accepted.length >= TARGET) break;
+      feedback = `Förra försöket gav bara ${accepted.length} godkända frågor (vi behöver ${TARGET}). Underkända: ${rejected.join("; ") || "inga"}. Skriv 12 NYA frågor om andra nyheter än dessa redan godkända: ${accepted.map((a) => a.question).join(" | ") || "inga"}.`;
     }
 
-    // Spridning över nyheter är ett önskemål, inte ett krav: räcker orden
-    // inte fylls krysset på med ord från samma nyhet.
-    if (best && best.entries.length < 5 && overflow.length) {
-      const pool = [...accepted, ...overflow.filter((o) => !accepted.some((a) => a.answer === o.answer))];
-      const layout = layoutCrossword(pool.map((e) => e.answer));
-      const placed = layout.placements.map((p) => pool[p.index]);
-      if (placed.length > best.entries.length) {
-        best = { entries: placed, layout: layoutCrossword(placed.map((e) => e.answer)) };
-      }
+    // Spridning över nyheter är ett önskemål, inte ett krav.
+    for (const q of overflow) {
+      if (accepted.length >= TARGET) break;
+      if (!accepted.some((a) => sameText(a, q))) accepted.push(q);
     }
 
-    if (!best || best.entries.length < 5) {
+    if (accepted.length < MIN_QUESTIONS) {
       return fail(
-        `AI:n hittade bara ${best?.entries.length ?? 0} ord som klarade kontrollerna (minst 5 behövs). ` +
-          `Underkända: ${lastRejected.slice(0, 12).join("; ") || "inga"}.`,
+        `AI:n hittade bara ${accepted.length} frågor som klarade kontrollerna (minst ${MIN_QUESTIONS} behövs). ` +
+          `Underkända: ${lastRejected.slice(0, 10).join("; ") || "inga"}.`,
       );
     }
 
@@ -413,10 +421,9 @@ Deno.serve(async (req) => {
       week_start: weekStart,
       status: "draft",
       title,
-      entries: best.entries.map(({ headlineIds: _ids, ...e }) => e),
-      layout: best.layout,
+      entries: accepted.map(({ headlineIds: _ids, ...q }) => q),
     });
-    return json({ status: "draft", id: row.id, words: best.entries.length, feedStats });
+    return json({ status: "draft", id: row.id, questions: accepted.length, feedStats });
   } catch (err) {
     return fail(err instanceof Error ? err.message : String(err));
   }

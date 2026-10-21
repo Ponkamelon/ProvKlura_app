@@ -203,25 +203,13 @@
     @apply rounded-full border-2 border-press/40 bg-white px-4 py-2 text-sm font-semibold text-press-dark transition-colors hover:bg-press-soft;
   }
 
-  .nutid-grid {
-    display: grid;
-    gap: 2px;
+  /* Svarsknapp i 1 X 2: tecknet i en rund bricka, alternativet bredvid. */
+  .nutid-option {
+    @apply flex w-full items-center gap-3 rounded-xl border-2 px-3 py-3 transition-colors;
   }
 
-  .nutid-cell {
-    @apply relative flex aspect-square items-center justify-center rounded-[3px] border border-navy/25 bg-white font-mono text-[clamp(0.7rem,3.6vw,1.15rem)] font-medium uppercase text-navy;
-  }
-
-  .nutid-cell-number {
-    @apply pointer-events-none absolute left-[2px] top-0 font-sans text-[8px] font-semibold leading-none text-navy/60 sm:text-[9px];
-  }
-
-  .nutid-cell.nutid-cell-solved {
-    @apply bg-seafoam;
-  }
-
-  .nutid-cell.nutid-cell-active {
-    @apply border-press bg-press-soft;
+  .nutid-sign {
+    @apply flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-press-soft font-mono text-lg font-semibold text-press-dark;
   }
 
   .field-label {

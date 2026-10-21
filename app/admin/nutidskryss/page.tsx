@@ -1,33 +1,33 @@
 import { WaveDivider } from "@/components/WaveDivider";
-import { NutidGrid } from "@/components/NutidGrid";
 import { SubmitButton } from "@/components/SubmitButton";
 import { ConfirmSubmitButton } from "@/components/ConfirmSubmitButton";
 import { requireProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { NUTID_COLUMNS } from "@/lib/nutid/current";
-import { isUsableKryss, type NutidKryssRow } from "@/lib/nutid/types";
+import { MIN_QUESTIONS, SIGNS, isUsableKryss, type NutidKryssRow } from "@/lib/nutid/types";
 import { currentWeekStart, isoWeekNumber } from "@/lib/nutid/week";
 import {
   publishNutidAction,
   rejectNutidAction,
-  removeNutidEntryAction,
+  removeNutidQuestionAction,
   requestNutidDraftAction,
-  updateNutidClueAction,
+  updateNutidQuestionAction,
 } from "@/app/actions/nutid";
-import { Icon } from "@/components/Icon";
 
 function weekLabel(k: NutidKryssRow) {
   return k.week_start ? `Vecka ${isoWeekNumber(k.week_start)}` : "Utan vecka";
 }
 
 function DraftCard({ kryss }: { kryss: NutidKryssRow }) {
-  const canRemove = kryss.entries.length > 4;
+  const canRemove = kryss.entries.length > MIN_QUESTIONS;
   return (
     <article className="nutid-card p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="nutid-badge">{weekLabel(kryss)} · utkast</p>
-          <h3 className="mt-2 text-lg font-semibold text-navy">{kryss.title}</h3>
+          <h3 className="mt-2 text-lg font-semibold text-navy">
+            {kryss.title} · {kryss.entries.length} frågor
+          </h3>
           <p className="text-xs text-navy/50">
             Skapat {new Date(kryss.created_at).toLocaleString("sv-SE", { dateStyle: "short", timeStyle: "short" })}
           </p>
@@ -35,96 +35,115 @@ function DraftCard({ kryss }: { kryss: NutidKryssRow }) {
         <div className="flex gap-2">
           <form action={rejectNutidAction.bind(null, kryss.id)}>
             <ConfirmSubmitButton message="Avvisa hela utkastet?" className="btn-secondary px-4 py-2 text-sm">
-              <Icon name="avbryt" size={18} />
               Avvisa
             </ConfirmSubmitButton>
           </form>
           <form action={publishNutidAction.bind(null, kryss.id)}>
             <SubmitButton pendingText="Publicerar…" className="btn-primary px-4 py-2 text-sm">
-              <Icon name="publicera" size={18} />
               Publicera
             </SubmitButton>
           </form>
         </div>
       </div>
 
-      <div className="mt-5 grid gap-6 lg:grid-cols-[minmax(0,18rem)_1fr]">
-        {kryss.layout && (
-          <NutidGrid
-            layout={kryss.layout}
-            letterAt={(cell) => cell.letter}
-            label={`Förhandsvisning med svar, ${kryss.entries.length} ord`}
-          />
-        )}
+      <ol className="mt-5 space-y-4">
+        {kryss.entries.map((q, index) => (
+          <li key={index} className="rounded-xl bg-white p-4">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <p className="font-medium text-navy">
+                {index + 1}. {q.question}
+              </p>
+              <span className="text-xs text-navy/50">{q.subject}</span>
+            </div>
+            <ul className="mt-2 space-y-1 text-sm">
+              {q.options.map((o, i) => (
+                <li key={i} className={i === q.correct ? "font-semibold text-ocean-dark" : "text-navy/70"}>
+                  <span className="mr-2 font-mono">{SIGNS[i]}</span>
+                  {o}
+                  {i === q.correct ? " ✓" : ""}
+                </li>
+              ))}
+            </ul>
+            {q.explanation && <p className="mt-2 text-xs text-navy/60">{q.explanation}</p>}
 
-        <ol className="space-y-4">
-          {kryss.layout?.placements.map((p) => {
-            const entry = kryss.entries[p.index];
-            if (!entry) return null;
-            return (
-              <li key={entry.answer} className="rounded-xl bg-white p-3">
-                <div className="flex flex-wrap items-baseline justify-between gap-2">
-                  <p>
-                    <span className="mr-2 font-mono text-sm text-press">
-                      {p.number}
-                      {p.dir === "across" ? "→" : "↓"}
-                    </span>
-                    <span className="font-mono font-semibold tracking-wider text-navy">{entry.answer}</span>
-                    <span className="ml-2 text-xs text-navy/50">
-                      {entry.subject} · {entry.concept}
-                    </span>
-                  </p>
-                  {canRemove && (
-                    <form action={removeNutidEntryAction.bind(null, kryss.id, entry.answer)}>
-                      <ConfirmSubmitButton
-                        message={`Ta bort ${entry.answer} ur krysset?`}
-                        className="text-xs text-navy/50 underline hover:text-coral-dark"
-                      >
-                        Ta bort ordet
-                      </ConfirmSubmitButton>
-                    </form>
-                  )}
-                </div>
+            {q.sources.length > 0 && (
+              <ul className="mt-2 space-y-1 text-xs text-navy/60">
+                {q.sources.map((s) => (
+                  <li key={`${s.source}-${s.url}`}>
+                    <span className="font-semibold">{s.source}:</span>{" "}
+                    {s.url ? (
+                      <a href={s.url} target="_blank" rel="noreferrer" className="underline">
+                        {s.title}
+                      </a>
+                    ) : (
+                      s.title
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
 
-                <form action={updateNutidClueAction.bind(null, kryss.id, entry.answer)} className="mt-2 flex gap-2">
-                  <label htmlFor={`clue-${kryss.id}-${entry.answer}`} className="sr-only">
-                    Ledtråd för {entry.answer}
+            <div className="mt-3 flex flex-wrap items-start gap-4 text-xs">
+              <details className="flex-1">
+                <summary className="cursor-pointer text-ocean underline">Ändra</summary>
+                <form action={updateNutidQuestionAction.bind(null, kryss.id, index)} className="mt-3 space-y-2">
+                  <label className="field-label" htmlFor={`q-${kryss.id}-${index}`}>
+                    Fråga
                   </label>
                   <textarea
-                    id={`clue-${kryss.id}-${entry.answer}`}
-                    name="clue"
-                    defaultValue={entry.clue}
+                    id={`q-${kryss.id}-${index}`}
+                    name="question"
+                    defaultValue={q.question}
                     rows={2}
-                    maxLength={200}
-                    className="field-input flex-1 py-2 text-sm"
+                    maxLength={300}
+                    className="field-input py-2 text-sm"
                   />
-                  <SubmitButton pendingText="…" className="btn-secondary self-start gap-1 px-3 py-2 text-xs">
-                    <Icon name="spara" size={14} />
+                  {q.options.map((o, i) => (
+                    <div key={i} className="flex items-center gap-2">
+                      <label className="flex items-center gap-1 text-sm text-navy" title="Rätt svar">
+                        <input type="radio" name="correct" value={i} defaultChecked={i === q.correct} />
+                        <span className="w-4 font-mono">{SIGNS[i]}</span>
+                      </label>
+                      <input
+                        aria-label={`Alternativ ${SIGNS[i]}`}
+                        name={`option_${i}`}
+                        defaultValue={o}
+                        maxLength={150}
+                        className="field-input flex-1 py-2 text-sm"
+                      />
+                    </div>
+                  ))}
+                  <p className="text-navy/50">Markera rätt svar med rundknappen.</p>
+                  <label className="field-label" htmlFor={`e-${kryss.id}-${index}`}>
+                    Förklaring (visas efter svaret)
+                  </label>
+                  <textarea
+                    id={`e-${kryss.id}-${index}`}
+                    name="explanation"
+                    defaultValue={q.explanation}
+                    rows={2}
+                    maxLength={300}
+                    className="field-input py-2 text-sm"
+                  />
+                  <SubmitButton pendingText="Sparar…" className="btn-secondary px-4 py-2 text-sm">
                     Spara
                   </SubmitButton>
                 </form>
-
-                {entry.sources.length > 0 && (
-                  <ul className="mt-2 space-y-1 text-xs text-navy/60">
-                    {entry.sources.map((s) => (
-                      <li key={`${s.source}-${s.url}`}>
-                        <span className="font-semibold">{s.source}:</span>{" "}
-                        {s.url ? (
-                          <a href={s.url} target="_blank" rel="noreferrer" className="underline">
-                            {s.title}
-                          </a>
-                        ) : (
-                          s.title
-                        )}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </li>
-            );
-          })}
-        </ol>
-      </div>
+              </details>
+              {canRemove && (
+                <form action={removeNutidQuestionAction.bind(null, kryss.id, index)}>
+                  <ConfirmSubmitButton
+                    message={`Ta bort fråga ${index + 1}?`}
+                    className="text-navy/50 underline hover:text-coral-dark"
+                  >
+                    Ta bort frågan
+                  </ConfirmSubmitButton>
+                </form>
+              )}
+            </div>
+          </li>
+        ))}
+      </ol>
     </article>
   );
 }
@@ -168,10 +187,10 @@ export default async function NutidskryssAdminPage({
       <h1 className="font-display text-3xl font-semibold text-navy">Nutidskrysset</h1>
       <WaveDivider className="mt-2 h-3 w-24" color="#B4235A" />
       <p className="mt-4 max-w-2xl text-navy/70">
-        Varje måndag morgon skapas ett utkast från SVT, Sveriges Radio, DN, SvD, Aftonbladet och
-        Expressen. Bara nyheter som finns hos minst två av dem används, och tunga ämnen som krig,
-        våld och brott sorteras bort. Inget syns för eleverna förrän du publicerar. Utan publicerat
-        kryss får eleverna ett av reservkryssen.
+        Varje måndag morgon skapas tio 1 X 2-frågor från SVT, Sveriges Radio, DN, SvD, Aftonbladet
+        och Expressen. Bara nyheter som finns hos minst två av dem används, och tunga ämnen som
+        krig, våld och brott sorteras bort. Inget syns för eleverna förrän du publicerar. Utan
+        publicerat kryss får eleverna ett av reservkryssen.
       </p>
 
       {searchParams.meddelande && (
@@ -227,7 +246,7 @@ export default async function NutidskryssAdminPage({
             {published.map((k) => (
               <li key={k.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-white/80 p-3">
                 <span className="font-medium text-navy">
-                  {weekLabel(k)} · {k.entries.map((e) => e.answer).join(", ")}
+                  {weekLabel(k)} · {k.entries.length} frågor
                 </span>
                 <form action={rejectNutidAction.bind(null, k.id)}>
                   <ConfirmSubmitButton
@@ -251,7 +270,7 @@ export default async function NutidskryssAdminPage({
         <ul className="mt-3 flex flex-wrap gap-2">
           {evergreen.map((k) => (
             <li key={k.id} className="nutid-badge">
-              {k.title} · {k.entries.length} ord
+              {k.title} · {k.entries.length} frågor
             </li>
           ))}
         </ul>

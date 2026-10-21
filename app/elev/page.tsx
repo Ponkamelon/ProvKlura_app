@@ -153,7 +153,7 @@ export default async function ElevDashboard() {
           <p className="text-sm text-navy/60">
             {nutidDone
               ? "Klart för veckan! Titta på din nutidskoll"
-              : "Ett litet kryss om vad som händer just nu"}
+              : "Tio frågor om veckans nyheter — 1, X eller 2"}
           </p>
         </div>
         <Icon name="nasta" className="text-navy/40" />

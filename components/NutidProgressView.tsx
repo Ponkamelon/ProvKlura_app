@@ -17,7 +17,7 @@ export function NutidProgressView({
   progress: NutidProgress;
   compact?: boolean;
 }) {
-  const { weeks, totalWords, level, trend } = progress;
+  const { weeks, totalCorrect, level, trend } = progress;
 
   return (
     <div>
@@ -28,8 +28,8 @@ export function NutidProgressView({
             <p className="font-display text-2xl font-semibold text-navy">{level.name}</p>
           </div>
           <p className="text-right">
-            <span className="font-mono text-3xl font-medium text-press">{totalWords}</span>
-            <span className="block text-xs text-navy/60">ord totalt</span>
+            <span className="font-mono text-3xl font-medium text-press">{totalCorrect}</span>
+            <span className="block text-xs text-navy/60">rätt totalt</span>
           </p>
         </div>
       )}
@@ -47,7 +47,7 @@ export function NutidProgressView({
             <div className="h-full rounded-full bg-press" style={{ width: `${Math.max(4, level.share * 100)}%` }} />
           </div>
           <p className="mt-1 text-xs text-navy/60">
-            {level.wordsToNext} ord kvar till {level.nextName}
+            {level.toNext} rätt kvar till {level.nextName}
           </p>
         </div>
       )}
@@ -67,7 +67,7 @@ export function NutidProgressView({
               </span>
               <span className="sr-only">
                 Vecka {w.week}: {dot.label}
-                {w.solved ? `, ${w.solved} ord` : ""}
+                {w.correct ? `, ${w.correct} rätt` : ""}
               </span>
             </li>
           );

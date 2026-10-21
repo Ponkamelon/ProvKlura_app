@@ -3,7 +3,7 @@ import { isUsableKryss, type NutidKryssRow } from "@/lib/nutid/types";
 
 type Client = ReturnType<typeof import("@/lib/supabase/server").createClient>;
 
-const COLUMNS = "id, week_start, status, is_evergreen, title, entries, layout, error, created_at, published_at";
+const COLUMNS = "id, week_start, status, is_evergreen, title, entries, error, created_at, published_at";
 
 /**
  * Veckans kryss: det publicerade nyhetskrysset för veckan om det finns,

@@ -18,7 +18,7 @@ export default async function NutidPage() {
     getCurrentKryss(supabase),
     supabase
       .from("nutidskryss_attempts")
-      .select("kryss_id, week_start, solved, solved_count, total, completed_at")
+      .select("kryss_id, week_start, solved_count, total, completed_at")
       .eq("student_id", profile.id),
     supabase
       .from("nutidskryss")
@@ -34,16 +34,16 @@ export default async function NutidPage() {
   const progress = computeProgress(attempts);
   const attemptFor = (id: string) => attempts.find((a) => a.kryss_id === id);
   const currentAttempt = current ? attemptFor(current.id) : undefined;
-  const wordCount = current?.layout?.placements.length ?? 0;
+  const questionCount = current?.entries.length ?? 0;
 
   let cta = "Starta veckans kryss";
-  let status = `${wordCount} ord · ca 5 minuter`;
+  let status = `${questionCount} frågor · 1 X 2 · ca 5 minuter`;
   if (currentAttempt?.completed_at) {
-    cta = "Titta på krysset igen";
-    status = "Klart! Snyggt jobbat.";
-  } else if (currentAttempt && currentAttempt.solved_count > 0) {
-    cta = "Fortsätt";
-    status = `${currentAttempt.solved_count} av ${currentAttempt.total} ord lösta`;
+    cta = "Se dina svar";
+    status = `Klart! Du fick ${currentAttempt.solved_count} av ${currentAttempt.total} rätt.`;
+  } else if (currentAttempt) {
+    cta = "Fortsätt där du var";
+    status = "Du har börjat — resten väntar på dig.";
   }
 
   return (
@@ -55,7 +55,7 @@ export default async function NutidPage() {
       <h1 className="mt-2 font-display text-3xl font-semibold text-navy">Nutidskrysset</h1>
       <WaveDivider className="mt-2 h-3 w-24" color="#B4235A" />
       <p className="mt-3 text-navy/70">
-        Ett litet kryss varje vecka om sådant som händer i världen just nu.
+        Tio frågor varje vecka om vad som händer i världen. Välj 1, X eller 2.
       </p>
 
       {current ? (
@@ -97,7 +97,7 @@ export default async function NutidPage() {
                 >
                   <span className="font-medium text-navy">Vecka {isoWeekNumber(k.week_start)}</span>
                   <span className="text-sm text-navy/60">
-                    {a?.completed_at ? "Klart ✓" : a?.solved_count ? `${a.solved_count} av ${total}` : `${total} ord`}
+                    {a?.completed_at ? `${a.solved_count} av ${a.total} rätt ✓` : a ? "Påbörjat" : `${total} frågor`}
                   </span>
                 </Link>
               );

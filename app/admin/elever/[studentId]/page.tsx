@@ -58,7 +58,7 @@ export default async function StudentDetailPage({
 
   const { data: nutidAttempts } = await supabase
     .from("nutidskryss_attempts")
-    .select("week_start, solved, solved_count, total, completed_at")
+    .select("week_start, solved_count, total, completed_at")
     .eq("student_id", student.id);
   const nutidProgress = computeProgress((nutidAttempts ?? []) as AttemptRow[]);
   const nutidActiveWeeks = nutidProgress.weeks.filter((w) => w.status !== "tom").length;
@@ -121,7 +121,7 @@ export default async function StudentDetailPage({
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <h2 className="font-display text-xl font-semibold text-navy">Nutidskrysset</h2>
           <p className="text-sm text-navy/60">
-            Med {nutidActiveWeeks} av de senaste 8 veckorna · {nutidProgress.totalWords} ord totalt ·
+            Med {nutidActiveWeeks} av de senaste 8 veckorna · {nutidProgress.totalCorrect} rätt totalt ·
             nivå {nutidProgress.level.name}
           </p>
         </div>
