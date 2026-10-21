@@ -8,6 +8,7 @@ import {
   shuffleOptions,
   type ProgressInfo,
 } from "@/lib/quiz/selection";
+import { getVariantsForStudySet } from "@/lib/quiz/variants";
 
 type QuestionRow = {
   id: string;
@@ -84,15 +85,21 @@ export default async function QuizPage({
     pool = selectQuestions(pool, progressMap, length);
   }
 
-  const preparedQuestions = pool.map((q) => ({
-    id: q.id,
-    question: q.question,
-    question_type: q.question_type,
-    answer_options: Array.isArray(q.answer_options)
-      ? shuffleOptions(q.answer_options as string[])
-      : null,
-    image_url: q.image_url ?? null,
-  }));
+  // Har föräldern aktiverat nya formuleringar används de; frågor utan
+  // omformulering visas som vanligt. Rättningen slår upp samma version.
+  const { variants } = await getVariantsForStudySet(supabase, params.studySetId);
+
+  const preparedQuestions = pool.map((q) => {
+    const variant = variants.get(q.id);
+    const options = variant?.answer_options ?? q.answer_options;
+    return {
+      id: q.id,
+      question: variant?.question ?? q.question,
+      question_type: q.question_type,
+      answer_options: Array.isArray(options) ? shuffleOptions(options as string[]) : null,
+      image_url: q.image_url ?? null,
+    };
+  });
 
   return (
     <QuizRunner

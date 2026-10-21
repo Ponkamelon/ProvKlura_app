@@ -2,6 +2,8 @@ import Link from "next/link";
 import { requireProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { Medal, medalForPercent } from "@/components/Medal";
+import { UpdatedBadge } from "@/components/UpdatedBadge";
+import { getUpdatedStudySetIds } from "@/lib/quiz/variants";
 import type { Tables } from "@/lib/database.types";
 
 type StudySetWithChapter = Tables<"study_sets"> & {
@@ -64,6 +66,10 @@ export default async function QuizStartPage({
   }
   const tier = bestPercent !== null ? medalForPercent(bestPercent) : null;
 
+  const isUpdated = (await getUpdatedStudySetIds(supabase, profile.id, [params.studySetId])).has(
+    params.studySetId,
+  );
+
   if (!total) {
     return (
       <div>
@@ -98,6 +104,16 @@ export default async function QuizStartPage({
         )}
       </div>
       <p className="mt-2 text-sm text-navy/60">{total} frågor redo</p>
+
+      {isUpdated && (
+        <div className="mt-4 rounded-xl border border-sun bg-sun/15 p-4">
+          <UpdatedBadge />
+          <p className="mt-2 text-sm text-navy">
+            Frågorna har fått nya formuleringar. Samma kunskap, nya ord — precis som det kan låta
+            på ett riktigt prov.
+          </p>
+        </div>
+      )}
 
       <div className="mt-6 space-y-3">
         {lengthOptions.map((o) => (

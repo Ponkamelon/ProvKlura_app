@@ -5,6 +5,8 @@ import { Medal, medalForPercent } from "@/components/Medal";
 import { requireProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { getSubjectVisual } from "@/lib/subjectVisuals";
+import { UpdatedBadge } from "@/components/UpdatedBadge";
+import { getUpdatedStudySetIds } from "@/lib/quiz/variants";
 
 type StudySetRow = {
   id: string;
@@ -65,6 +67,8 @@ export default async function NationellaProvPage() {
         .not("completed_at", "is", null)
         .in("study_set_id", studySetIds)
     : { data: [] as { study_set_id: string; score: number | null; total_questions: number | null }[] };
+
+  const updatedSetIds = await getUpdatedStudySetIds(supabase, profile.id, studySetIds);
 
   const bestPercentByStudySet = new Map<string, number>();
   for (const a of attempts ?? []) {
@@ -150,7 +154,10 @@ export default async function NationellaProvPage() {
                         className="flex items-center justify-between gap-3 rounded-xl bg-sand/60 p-3 transition-colors hover:bg-sand"
                       >
                         <div>
-                          <p className="font-medium text-navy">{s.title}</p>
+                          <p className="flex flex-wrap items-center gap-2 font-medium text-navy">
+                            {s.title}
+                            {updatedSetIds.has(s.id) && <UpdatedBadge />}
+                          </p>
                           <p className="text-xs text-navy/50">
                             {s.set_type === "sluttest" ? "Sluttest" : "Deltest"}
                           </p>

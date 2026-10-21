@@ -2,6 +2,7 @@
 
 import { requireProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { getVariantForQuestion } from "@/lib/quiz/variants";
 
 /**
  * Rätt svar valideras alltid server-side — klienten får aldrig
@@ -47,13 +48,17 @@ export async function submitAnswerAction(params: {
     throw new Error("Frågan hittades inte");
   }
 
+  // Omformulerad version (om föräldern aktiverat en): rätt svar och
+  // förklaring kommer därifrån, men originalets svar godkänns också.
+  const variant = await getVariantForQuestion(supabase, params.questionId);
+
   const normalizedSelected = params.selectedAnswer.trim().toLowerCase();
-  const acceptedAnswers = Array.isArray(question.accepted_answers)
-    ? (question.accepted_answers as string[])
-    : [];
-  const acceptedList = [question.correct_answer, ...acceptedAnswers].map((a) =>
-    a.trim().toLowerCase(),
-  );
+  const asList = (v: unknown) => (Array.isArray(v) ? (v as string[]) : []);
+  const acceptedList = [
+    ...(variant ? [variant.correct_answer, ...asList(variant.accepted_answers)] : []),
+    question.correct_answer,
+    ...asList(question.accepted_answers),
+  ].map((a) => a.trim().toLowerCase());
   const correct = acceptedList.includes(normalizedSelected);
 
   await supabase.from("answers").insert({
@@ -99,8 +104,8 @@ export async function submitAnswerAction(params: {
 
   return {
     correct,
-    correctAnswer: question.correct_answer,
-    explanation: question.explanation,
+    correctAnswer: variant?.correct_answer ?? question.correct_answer,
+    explanation: variant?.explanation ?? question.explanation,
   };
 }
 

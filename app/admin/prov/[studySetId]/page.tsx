@@ -122,6 +122,11 @@ export default async function StudySetReviewPage({
         {studySet.exam_date && <span>· Prov {studySet.exam_date}</span>}
         <span>· {questions?.length ?? 0} frågor skapade</span>
         <span>· {publishedCount} publicerade</span>
+        {publishedCount > 0 && (
+          <Link href={`/admin/omformulera/${params.studySetId}`} className="text-ocean underline">
+            · Formulera om frågorna
+          </Link>
+        )}
       </div>
 
       <section className="mt-6 notebook-card p-6">

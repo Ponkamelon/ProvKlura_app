@@ -3,6 +3,8 @@ import { requireProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { Medal, medalForPercent } from "@/components/Medal";
 import { currentWeekStart } from "@/lib/nutid/week";
+import { UpdatedBadge } from "@/components/UpdatedBadge";
+import { getUpdatedStudySetIds } from "@/lib/quiz/variants";
 
 export default async function ElevDashboard() {
   const profile = await requireProfile("student");
@@ -84,6 +86,15 @@ export default async function ElevDashboard() {
 
   const firstName = profile.display_name.split(" ")[0];
 
+  const updatedSetIds = await getUpdatedStudySetIds(
+    supabase,
+    profile.id,
+    (allStudySets ?? []).filter((s) => s.set_type !== "skriv").map((s) => s.id),
+  );
+  const nationellaUpdated = (allStudySets ?? []).some(
+    (s) => s.is_official && s.set_type !== "skriv" && updatedSetIds.has(s.id),
+  );
+
   // Har eleven redan gjort klart något kryss den här veckan?
   const { count: nutidDoneCount } = await supabase
     .from("nutidskryss_attempts")
@@ -105,7 +116,10 @@ export default async function ElevDashboard() {
           className="notebook-card mt-6 flex items-center justify-between gap-3 border-l-4 border-coral p-4 transition-transform hover:-translate-y-0.5"
         >
           <div>
-            <p className="font-medium text-navy">Nationella prov</p>
+            <p className="flex items-center gap-2 font-medium text-navy">
+              Nationella prov
+              {nationellaUpdated && <UpdatedBadge />}
+            </p>
             <p className="text-sm text-navy/60">
               Dina tilldelade övningsprov inför nationella proven
             </p>
@@ -179,7 +193,10 @@ export default async function ElevDashboard() {
               >
                 <div>
                   {subjectName && <p className="text-xs text-navy/50">{subjectName}</p>}
-                  <p className="font-medium text-navy">{s.title}</p>
+                  <p className="flex flex-wrap items-center gap-2 font-medium text-navy">
+                    {s.title}
+                    {updatedSetIds.has(s.id) && <UpdatedBadge />}
+                  </p>
                   {s.exam_date && (
                     <p className="mt-1 text-sm text-coral">Prov {s.exam_date}</p>
                   )}

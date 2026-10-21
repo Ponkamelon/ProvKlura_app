@@ -86,6 +86,17 @@ export default async function TestbibliotekSubjectPage({
         .in("study_set_id", studySetIds)
     : { data: [] as { id: string; study_set_id: string; student_id: string }[] };
 
+  // Tester där föräldern har en aktiv omformulerad version.
+  const { data: activeRewordings } = studySetIds.length
+    ? await supabase
+        .from("test_rewordings")
+        .select("study_set_id")
+        .eq("admin_id", profile.id)
+        .eq("status", "active")
+        .in("study_set_id", studySetIds)
+    : { data: [] as { study_set_id: string }[] };
+  const rewordedSetIds = new Set((activeRewordings ?? []).map((r) => r.study_set_id));
+
   const studentNameById = new Map((students ?? []).map((s) => [s.id, s.display_name]));
 
   const assignmentsBySet = new Map<string, { id: string; student_id: string }[]>();
@@ -128,9 +139,15 @@ export default async function TestbibliotekSubjectPage({
             )}
           </div>
         </div>
-        {isWriting && (
+        {isWriting ? (
           <p className="mt-1 text-sm text-navy/60">
             Lär → Träna → Testa. Eleven väljer 5, 10 eller 20 minuter.
+          </p>
+        ) : (
+          <p className="mt-1 text-sm">
+            <Link href={`/admin/omformulera/${set.id}`} className="text-ocean underline">
+              {rewordedSetIds.has(set.id) ? "Nya formuleringar (aktiva)" : "Formulera om frågorna"}
+            </Link>
           </p>
         )}
 
