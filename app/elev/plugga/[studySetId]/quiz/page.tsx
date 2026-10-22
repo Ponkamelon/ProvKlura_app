@@ -106,6 +106,7 @@ export default async function QuizPage({
       studySetId={params.studySetId}
       questions={preparedQuestions}
       feedbackTiming={feedbackTiming}
+      canRequestRenewal={searchParams.mode !== "mistakes"}
     />
   );
 }

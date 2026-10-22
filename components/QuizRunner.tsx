@@ -10,6 +10,7 @@ import {
 } from "@/app/actions/quiz";
 import { Medal, medalForPercent } from "@/components/Medal";
 import { Icon } from "@/components/Icon";
+import { RenewalRequestButton } from "@/components/RenewalRequestButton";
 
 type QuizQuestion = {
   id: string;
@@ -31,10 +32,13 @@ export function QuizRunner({
   studySetId,
   questions,
   feedbackTiming = "immediate",
+  canRequestRenewal = true,
 }: {
   studySetId: string;
   questions: QuizQuestion[];
   feedbackTiming?: "immediate" | "end_of_test";
+  /** Falskt för "Träna mina fel" — där räknas inte alla rätt som att kunna hela testet. */
+  canRequestRenewal?: boolean;
 }) {
   const [attemptId, setAttemptId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -147,6 +151,19 @@ export function QuizRunner({
               : "Bra jobbat — fortsätt träna det svåra."}
           </p>
         </div>
+
+        {percent === 100 && canRequestRenewal && (
+          <div className="notebook-card mt-6 p-5 text-center">
+            <p className="font-display text-lg font-semibold text-navy">Alla rätt! 🏆</p>
+            <p className="mt-1 text-sm text-navy/70">
+              Kan du testet utantill nu? Be om ett nytt test, så får frågorna och svaren nya
+              formuleringar och en ny ordning.
+            </p>
+            <div className="mt-4 flex justify-center">
+              <RenewalRequestButton studySetId={studySetId} />
+            </div>
+          </div>
+        )}
 
         {!showImmediateFeedback && answered.length > 0 && (
           <div className="mt-8 space-y-3">

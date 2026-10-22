@@ -6,6 +6,7 @@ import { UpdatedBadge } from "@/components/UpdatedBadge";
 import { getUpdatedStudySetIds } from "@/lib/quiz/variants";
 import type { Tables } from "@/lib/database.types";
 import { Icon } from "@/components/Icon";
+import { RenewalRequestButton } from "@/components/RenewalRequestButton";
 
 type StudySetWithChapter = Tables<"study_sets"> & {
   chapters: { title: string; subjects: { name: string } | null } | null;
@@ -58,6 +59,27 @@ export default async function QuizStartPage({
     .eq("student_id", profile.id)
     .eq("study_set_id", params.studySetId)
     .not("completed_at", "is", null);
+
+  // Önskemål om att förnya testet (efter alla rätt). Efter en förnyelse eller
+  // ett "Inte nu" krävs ett nytt försök med alla rätt innan eleven kan be igen.
+  const { data: renewals } = await supabase
+    .from("renewal_requests")
+    .select("status, resolved_at")
+    .eq("student_id", profile.id)
+    .eq("study_set_id", params.studySetId);
+  const renewalOpen = (renewals ?? []).some((r) => r.status === "open");
+  const lastResolved = (renewals ?? [])
+    .map((r) => r.resolved_at)
+    .filter((d): d is string => !!d)
+    .sort()
+    .pop();
+  const hasFreshFullScore = (attempts ?? []).some(
+    (a) =>
+      !!a.total_questions &&
+      a.score === a.total_questions &&
+      a.total_questions >= Math.min(5, publishedCount ?? 1) &&
+      (!lastResolved || (a.completed_at ?? "") > lastResolved),
+  );
 
   let bestPercent: number | null = null;
   for (const a of attempts ?? []) {
@@ -115,6 +137,24 @@ export default async function QuizStartPage({
             Frågorna har fått nya formuleringar. Samma kunskap, nya ord — precis som det kan låta
             på ett riktigt prov.
           </p>
+        </div>
+      )}
+
+      {(renewalOpen || hasFreshFullScore) && (
+        <div className="notebook-card mt-4 p-4">
+          {renewalOpen ? (
+            <RenewalRequestButton studySetId={params.studySetId} alreadyRequested />
+          ) : (
+            <>
+              <p className="text-sm text-navy">
+                Du har haft alla rätt på det här testet! 🏆 Vill du ha nya formuleringar så det blir en
+                ny utmaning?
+              </p>
+              <div className="mt-3">
+                <RenewalRequestButton studySetId={params.studySetId} />
+              </div>
+            </>
+          )}
         </div>
       )}
 

@@ -17,6 +17,8 @@ import { SubmitButton } from "@/components/SubmitButton";
 import { ConfirmSubmitButton } from "@/components/ConfirmSubmitButton";
 import type { Tables } from "@/lib/database.types";
 import { Icon } from "@/components/Icon";
+import { RenewalBanner } from "@/components/RenewalBanner";
+import { getOpenRenewals } from "@/lib/renewal/requests";
 
 // regenerateQuestionsAction (Försök igen) kör samma AI-anrop som kan ta
 // 15–40 sekunder — samma anledning som i admin/prov/ny/page.tsx.
@@ -82,6 +84,7 @@ export default async function StudySetReviewPage({
         .order("created_at", { ascending: false }),
     ]);
 
+  const renewals = await getOpenRenewals(supabase, profile.id, [params.studySetId]);
   const assignedIds = new Set(assignments?.map((a) => a.student_id));
   const publishedCount = questions?.filter((q) => q.status === "published").length ?? 0;
   const highConfidenceDrafts =
@@ -132,6 +135,12 @@ export default async function StudySetReviewPage({
           </Link>
         )}
       </div>
+
+      <RenewalBanner
+        studySetId={params.studySetId}
+        requests={renewals}
+        returnPath={`/admin/prov/${params.studySetId}`}
+      />
 
       <section className="mt-6 notebook-card p-6">
         <h2 className="font-display text-xl font-semibold text-navy">Tilldela</h2>

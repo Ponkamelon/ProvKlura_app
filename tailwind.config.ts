@@ -26,6 +26,7 @@ const config: Config = {
           dark: "#E0522F",
         },
         sun: "#F4B942", // framgång, guldmedalj, highlights
+        alert: "#D7263D", // röd prick: något väntar på föräldern
         ink: {
           DEFAULT: "#5B4B9E", // Skrivklura — bläck: accent för skrivövningar
           dark: "#43377A",

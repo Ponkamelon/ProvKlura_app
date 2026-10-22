@@ -4,6 +4,8 @@ import { requireProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { Icon } from "@/components/Icon";
 import { ShareAppButton } from "@/components/ShareAppButton";
+import { RenewalDot } from "@/components/RenewalDot";
+import { getOpenRenewals } from "@/lib/renewal/requests";
 
 export default async function AdminDashboard() {
   const profile = await requireProfile("admin");
@@ -37,12 +39,46 @@ export default async function AdminDashboard() {
           .eq("status", "draft")
       : { count: 0 };
 
+  const renewals = await getOpenRenewals(supabase, profile.id);
+  const renewalTitles = renewals.length
+    ? await supabase
+        .from("study_sets")
+        .select("id, title")
+        .in("id", [...new Set(renewals.map((r) => r.studySetId))])
+    : { data: [] as { id: string; title: string }[] };
+  const titleById = new Map((renewalTitles.data ?? []).map((s) => [s.id, s.title]));
+
   return (
     <div>
       <h1 className="font-display text-3xl font-semibold text-navy">
         Hej {firstName}!
       </h1>
       <WaveDivider className="mt-2 h-3 w-24" color="#FF6B4A" />
+
+      {renewals.length > 0 && (
+        <section className="mt-6 rounded-xl border-2 border-alert/40 bg-white/70 p-4" aria-labelledby="fornya-rubrik">
+          <h2 id="fornya-rubrik" className="flex items-center gap-2 font-semibold text-navy">
+            <RenewalDot label="Önskemål om förnyade test" />
+            Vill ha nya test
+          </h2>
+          <ul className="mt-2 space-y-1 text-sm">
+            {renewals.map((r) => (
+              <li key={r.id}>
+                <Link
+                  href={
+                    r.isOfficial
+                      ? `/admin/testbibliotek/${r.subjectId ?? ""}#test-${r.studySetId}`
+                      : `/admin/prov/${r.studySetId}`
+                  }
+                  className="text-ocean hover:underline"
+                >
+                  {r.studentName} fick alla rätt på {titleById.get(r.studySetId) ?? "ett test"}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <div className="mt-8 grid gap-4 sm:grid-cols-3">
         <Link
@@ -64,7 +100,10 @@ export default async function AdminDashboard() {
           href="/admin/prov"
           className="notebook-card block p-6 transition-transform hover:-translate-y-0.5"
         >
-          <p className="text-sm text-navy/60">Pluggprojekt</p>
+          <p className="flex items-center gap-2 text-sm text-navy/60">
+            Pluggprojekt
+            {renewals.some((r) => !r.isOfficial) && <RenewalDot label="En elev vill att ett pluggprojekt förnyas" />}
+          </p>
           <p className="mt-1 font-display text-3xl font-semibold text-navy">
             {studySetCount ?? 0}
           </p>
@@ -84,7 +123,10 @@ export default async function AdminDashboard() {
           href="/admin/testbibliotek"
           className="notebook-card flex flex-col items-center justify-center gap-2 border-l-4 border-coral p-6 text-center transition-transform hover:-translate-y-0.5"
         >
-          <span className="btn-secondary">📚 Nationella prov</span>
+          <span className="btn-secondary">
+            📚 Nationella prov
+            {renewals.some((r) => r.isOfficial) && <RenewalDot label="En elev vill att ett nationellt prov förnyas" />}
+          </span>
           <span className="text-xs text-navy/50">Färdiga, dela direkt</span>
         </Link>
 

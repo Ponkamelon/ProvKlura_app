@@ -10,6 +10,9 @@ import {
   unshareOfficialTestAction,
 } from "@/app/actions/testLibrary";
 import { Icon } from "@/components/Icon";
+import { RenewalDot } from "@/components/RenewalDot";
+import { RenewalBanner } from "@/components/RenewalBanner";
+import { getOpenRenewals, groupBySet } from "@/lib/renewal/requests";
 
 type StudySetRow = {
   id: string;
@@ -99,6 +102,7 @@ export default async function TestbibliotekSubjectPage({
   const rewordedSetIds = new Set((activeRewordings ?? []).map((r) => r.study_set_id));
 
   const studentNameById = new Map((students ?? []).map((s) => [s.id, s.display_name]));
+  const renewalsBySet = groupBySet(await getOpenRenewals(supabase, profile.id, studySetIds));
 
   const assignmentsBySet = new Map<string, { id: string; student_id: string }[]>();
   for (const a of existingAssignments ?? []) {
@@ -122,11 +126,15 @@ export default async function TestbibliotekSubjectPage({
 
     return (
       <div
-        className={`${isWriting ? "skriv-card" : "notebook-card"} scroll-mb-24 p-4`}
+        id={`test-${set.id}`}
+        className={`${isWriting ? "skriv-card" : "notebook-card"} scroll-mb-24 scroll-mt-6 p-4`}
         style={isWriting ? undefined : { borderLeft: `6px solid ${subjectVisual.color}` }}
       >
         <div className="flex items-center justify-between gap-3">
-          <p className="font-medium text-navy">{set.title}</p>
+          <p className="flex items-center gap-2 font-medium text-navy">
+            {set.title}
+            {renewalsBySet.has(set.id) && <RenewalDot />}
+          </p>
           <div className="flex shrink-0 items-center gap-2">
             {isWriting ? (
               <SkrivBadge />
@@ -151,6 +159,15 @@ export default async function TestbibliotekSubjectPage({
               {rewordedSetIds.has(set.id) ? "Nya formuleringar (aktiva)" : "Formulera om frågorna"}
             </Link>
           </p>
+        )}
+
+        {!isWriting && (
+          <RenewalBanner
+            studySetId={set.id}
+            requests={renewalsBySet.get(set.id) ?? []}
+            returnPath={`/admin/testbibliotek/${subjectId}`}
+            compact
+          />
         )}
 
         {shares.length > 0 && (

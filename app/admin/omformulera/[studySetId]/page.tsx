@@ -13,6 +13,8 @@ import {
   updateVariantAction,
 } from "@/app/actions/rewording";
 import { Icon } from "@/components/Icon";
+import { RenewalBanner } from "@/components/RenewalBanner";
+import { getOpenRenewals } from "@/lib/renewal/requests";
 
 // AI-omformuleringen körs i en Server Action från den här sidan.
 export const maxDuration = 60;
@@ -213,6 +215,7 @@ export default async function RewordPage({
       .eq("assigned_by", profile.id),
   ]);
 
+  const renewals = await getOpenRenewals(supabase, profile.id, [studySet.id]);
   const all = (rewordings ?? []) as Rewording[];
   const active = all.find((r) => r.status === "active");
   const draft = all.find((r) => r.status === "draft");
@@ -258,6 +261,19 @@ export default async function RewordPage({
             : "Du har inte delat testet med någon elev än. Versionen gäller dina elever när du delar det."}
         </p>
       </div>
+
+      <RenewalBanner
+        studySetId={studySet.id}
+        requests={renewals}
+        returnPath={`/admin/omformulera/${studySet.id}`}
+        showRewordLink={false}
+      />
+      {renewals.length > 0 && (
+        <p className="mt-2 text-sm text-navy/60">
+          Tryck på {active ? "Formulera om igen" : "Formulera om testet"} nedan och sedan Aktivera, så
+          försvinner den röda pricken.
+        </p>
+      )}
 
       {searchParams.meddelande && (
         <p className="mt-4 rounded-xl bg-white p-4 text-navy" role="status">

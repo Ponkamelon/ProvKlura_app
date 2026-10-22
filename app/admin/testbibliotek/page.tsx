@@ -7,10 +7,15 @@ import { isWritingSubject } from "@/lib/writing/subjects";
 import { getSubjectVisual } from "@/lib/subjectVisuals";
 import { requireProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { RenewalDot } from "@/components/RenewalDot";
+import { getOpenRenewals } from "@/lib/renewal/requests";
 
 export default async function TestbibliotekPage() {
-  await requireProfile("admin");
+  const profile = await requireProfile("admin");
   const supabase = createClient();
+  const renewalSubjects = new Set(
+    (await getOpenRenewals(supabase, profile.id)).filter((r) => r.isOfficial).map((r) => r.subjectId),
+  );
 
   const { data: subjects } = await supabase
     .from("subjects")
@@ -58,7 +63,10 @@ export default async function TestbibliotekPage() {
                       height={40}
                       className="rounded-lg"
                     />
-                    <p className="font-medium text-navy">{s.name}</p>
+                    <p className="flex items-center gap-2 font-medium text-navy">
+                      {s.name}
+                      {renewalSubjects.has(s.id) && <RenewalDot label="En elev vill att ett test här förnyas" />}
+                    </p>
                   </div>
                   {isWriting ? <SkrivBadge /> : <OfficialBadge />}
                 </div>

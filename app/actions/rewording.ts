@@ -144,6 +144,17 @@ export async function activateRewordingAction(studySetId: string, rewordingId: s
     .eq("admin_id", profile.id)
     .eq("status", "draft");
 
+  if (!error) {
+    // Elevens önskemål om ett förnyat test är nu uppfyllt — den röda pricken försvinner.
+    await supabase
+      .from("renewal_requests")
+      .update({ status: "done", resolved_at: new Date().toISOString() })
+      .eq("study_set_id", studySetId)
+      .eq("admin_id", profile.id)
+      .eq("status", "open");
+    revalidatePath("/admin", "layout");
+  }
+
   done(studySetId, error ? `Kunde inte aktivera: ${error.message}` : "Aktiverat! Eleven ser en ikon om att testet är uppdaterat.");
 }
 

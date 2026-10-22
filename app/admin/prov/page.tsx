@@ -3,6 +3,8 @@ import { WaveDivider } from "@/components/WaveDivider";
 import { requireProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { Icon } from "@/components/Icon";
+import { RenewalDot } from "@/components/RenewalDot";
+import { getOpenRenewals, groupBySet, joinNames } from "@/lib/renewal/requests";
 
 type StudySetListItem = {
   id: string;
@@ -29,6 +31,7 @@ export default async function ProvListPage({
 
   const studySets = (data ?? []) as unknown as StudySetListItem[];
   const createdParts = Number(searchParams.created_parts ?? 0);
+  const renewalsBySet = groupBySet(await getOpenRenewals(supabase, profile.id, studySets.map((s) => s.id)));
 
   return (
     <div>
@@ -75,7 +78,14 @@ export default async function ProvListPage({
             <p className="text-xs text-navy/50">
               {s.chapters?.subjects?.name} · {s.chapters?.title}
             </p>
-            <p className="font-medium text-navy">{s.title}</p>
+            <p className="flex items-center gap-2 font-medium text-navy">
+              {s.title}
+              {renewalsBySet.has(s.id) && (
+                <RenewalDot
+                  label={`${joinNames(renewalsBySet.get(s.id)!.map((r) => r.studentName))} vill att testet förnyas`}
+                />
+              )}
+            </p>
             <p className="mt-1 text-sm text-navy/60">
               Åk {s.grade_level} · {s.questions?.[0]?.count ?? 0} frågor ·{" "}
               {s.status === "published" ? "Publicerat" : "Utkast"}

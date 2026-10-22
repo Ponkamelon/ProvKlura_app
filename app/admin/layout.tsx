@@ -5,6 +5,8 @@ import { requireProfile } from "@/lib/auth";
 import { signOutAction } from "@/app/actions/auth";
 import { createClient } from "@/lib/supabase/server";
 import { Icon } from "@/components/Icon";
+import { RenewalDot } from "@/components/RenewalDot";
+import { getOpenRenewals } from "@/lib/renewal/requests";
 
 export default async function AdminLayout({
   children,
@@ -23,6 +25,11 @@ export default async function AdminLayout({
           .select("id", { count: "exact", head: true })
           .eq("status", "draft")
       : { count: 0 };
+
+  // Elever som fått alla rätt och vill ha ett test förnyat — röd prick i menyn.
+  const renewals = await getOpenRenewals(supabase, profile.id);
+  const renewOwn = renewals.some((r) => !r.isOfficial);
+  const renewOfficial = renewals.some((r) => r.isOfficial);
 
   return (
     <div className="min-h-screen bg-sand">
@@ -47,11 +54,13 @@ export default async function AdminLayout({
               <Link href="/admin/elever" className="hover:text-ocean">
                 Elever
               </Link>
-              <Link href="/admin/prov" className="hover:text-ocean">
+              <Link href="/admin/prov" className="inline-flex items-center gap-1.5 hover:text-ocean">
                 Pluggprojekt
+                {renewOwn && <RenewalDot label="En elev vill att ett pluggprojekt förnyas" />}
               </Link>
-              <Link href="/admin/testbibliotek" className="hover:text-ocean">
+              <Link href="/admin/testbibliotek" className="inline-flex items-center gap-1.5 hover:text-ocean">
                 Testbibliotek
+                {renewOfficial && <RenewalDot label="En elev vill att ett nationellt prov förnyas" />}
               </Link>
               {isEditor === true && (
                 <Link href="/admin/nutidskryss" className="hover:text-ocean">
