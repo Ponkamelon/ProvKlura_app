@@ -142,6 +142,16 @@ export default async function AdminDashboard() {
           </Link>
         )}
 
+        {isEditor === true && (
+          <Link
+            href="/admin/matning"
+            className="notebook-card flex flex-col items-center justify-center gap-2 p-6 text-center transition-transform hover:-translate-y-0.5"
+          >
+            <span className="font-semibold text-navy">📊 Mätning av nuläget</span>
+            <span className="text-xs text-navy/60">Startgrad, slutförande och återkomst</span>
+          </Link>
+        )}
+
         <div className="notebook-card flex flex-col items-center justify-center gap-2 p-6 text-center">
           <p className="font-semibold text-navy">Känner du fler föräldrar?</p>
           <p className="text-xs text-navy/60">Tipsa dem om ProvKlura</p>
