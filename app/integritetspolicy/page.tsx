@@ -66,6 +66,16 @@ export default function IntegritetspolicyPage() {
             skriver i skrivövningarna och den feedback eleven får, så att
             eleven kan se hur långt hen har kommit.
           </p>
+          <p className="mt-2">
+            <strong>Användningsstatistik:</strong> för att förstå om appen
+            hjälper eleverna att komma igång och lära sig loggar vi vad som
+            händer i appen, till exempel att ett pass startades eller
+            avslutades, om ett svar var rätt eller fel och hur lång tid det
+            tog. Statistiken sparas med ett slumpat elev-ID i stället för
+            namn, och innehåller inga diagnoser, anpassningsinställningar
+            eller fritextsvar. Vi använder inga analystjänster från tredje
+            part.
+          </p>
         </section>
 
         <section>
@@ -75,7 +85,9 @@ export default function IntegritetspolicyPage() {
           <p className="mt-2">
             För att tillhandahålla tjänsten: skapa konton, generera
             övningsfrågor, visa resultat och studieframsteg till admin och
-            elev, samt anpassa upplevelsen efter elevens behov.
+            elev, samt anpassa upplevelsen efter elevens behov. Användningsstatistiken
+            används för att följa upp och förbättra appen, till exempel om
+            eleverna återkommer och om kunskaperna sitter kvar över tid.
           </p>
         </section>
 
@@ -126,6 +138,12 @@ export default function IntegritetspolicyPage() {
             Så länge kontot är aktivt. En admin kan när som helst begära att
             ett elevkonto och dess uppgifter raderas — kontakta
             [e-postadress].
+          </p>
+          <p className="mt-2">
+            Användningsstatistiken raderas automatiskt efter 12 månader. Tas
+            ett elevkonto bort raderas också kopplingen mellan eleven och
+            det slumpade ID:t, så att statistiken inte längre kan knytas
+            till eleven.
           </p>
         </section>
 

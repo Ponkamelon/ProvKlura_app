@@ -8,6 +8,7 @@ import { getUpdatedStudySetIds } from "@/lib/quiz/variants";
 import { Icon } from "@/components/Icon";
 import { StudyOverview } from "@/components/StudyOverview";
 import { parseOverview } from "@/lib/overview/streak";
+import { logEvent } from "@/lib/events/log";
 
 export default async function ElevDashboard() {
   const profile = await requireProfile("student");
@@ -15,8 +16,10 @@ export default async function ElevDashboard() {
 
   const { data: assignments } = await supabase
     .from("assignments")
-    .select("study_set_id")
+    .select("study_set_id, exam_date")
     .eq("student_id", profile.id);
+  // Provdatumet ligger på tilldelningen (steg 0); setets datum är bara förval.
+  const examDateBySet = new Map((assignments ?? []).map((a) => [a.study_set_id, a.exam_date as string | null]));
 
   const studySetIds = assignments?.map((a) => a.study_set_id) ?? [];
 
@@ -113,6 +116,9 @@ export default async function ElevDashboard() {
   if (overviewError) console.error("Kunde inte hämta elevöversikt:", overviewError);
   const overview = parseOverview(overviewRaw);
 
+  // Mätning (steg 0): besök på startsidan, så att startgraden kan räknas.
+  await logEvent(supabase, "home_viewed");
+
   return (
     <div>
       <h1 className="font-display text-2xl font-semibold text-navy">
@@ -208,8 +214,8 @@ export default async function ElevDashboard() {
                     {s.title}
                     {updatedSetIds.has(s.id) && <UpdatedBadge />}
                   </p>
-                  {s.exam_date && (
-                    <p className="mt-1 text-sm text-coral">Prov {s.exam_date}</p>
+                  {(examDateBySet.get(s.id) ?? s.exam_date) && (
+                    <p className="mt-1 text-sm text-coral">Prov {examDateBySet.get(s.id) ?? s.exam_date}</p>
                   )}
                 </div>
                 {tier && (

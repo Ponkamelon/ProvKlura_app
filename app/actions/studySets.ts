@@ -6,6 +6,7 @@ import { requireProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { generateQuestionsFromText } from "@/lib/ai/generateQuestions";
 import { jaccardSimilarity, DUPLICATE_THRESHOLD } from "@/lib/ai/dedupe";
+import { loadCandidatePoints, pointLabel, resolveKnowledgePoints } from "@/lib/knowledge/points";
 
 const MAX_WORDS_PER_PART = 700;
 const MAX_PARTS = 4;
@@ -70,11 +71,15 @@ async function generateAndSaveQuestions(params: {
   const { studySetId, materialId, text, subjectName, chapterTitle, gradeLevel } = params;
   const supabase = createClient();
 
+  // Steg 0: AI:n väljer kunskapspunkt ur banken (och setets egna punkter).
+  const candidates = await loadCandidatePoints(supabase, subjectName, studySetId, chapterTitle);
+
   const generated = await generateQuestionsFromText({
     text,
     subjectName,
     chapterTitle,
     gradeLevel,
+    knowledgePoints: candidates.map(pointLabel),
   });
 
   const { data: existing } = await supabase
@@ -95,10 +100,19 @@ async function generateAndSaveQuestions(params: {
 
   if (!accepted.length) return;
 
-  const rows = accepted.map((q) => ({
+  const pointIds = await resolveKnowledgePoints(supabase, {
+    studySetId,
+    subjectName,
+    chapterTitle,
+    candidates,
+    choices: accepted.map((q) => ({ knowledgePoint: q.knowledge_point, knowledgeUnit: q.knowledge_unit })),
+  });
+
+  const rows = accepted.map((q, i) => ({
     study_set_id: studySetId,
     source_material_id: materialId,
     knowledge_unit: q.knowledge_unit ?? null,
+    knowledge_point_id: pointIds[i],
     question_type: q.type,
     question: q.question,
     answer_options: q.type === "multiple_choice" && q.options ? q.options : null,

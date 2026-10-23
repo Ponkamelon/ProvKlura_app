@@ -107,6 +107,7 @@ export default async function QuizPage({
       questions={preparedQuestions}
       feedbackTiming={feedbackTiming}
       canRequestRenewal={searchParams.mode !== "mistakes"}
+      mode={searchParams.mode === "mistakes" ? "mistakes" : "test"}
     />
   );
 }

@@ -1,6 +1,8 @@
 type Client = ReturnType<typeof import("@/lib/supabase/server").createClient>;
 
 export type QuestionVariant = {
+  /** Variantens id (finns när den hämtats för rättning). */
+  id?: string;
   question_id: string;
   question: string;
   answer_options: string[] | null;
@@ -58,7 +60,7 @@ export async function getVariantsForStudySet(
 export async function getVariantForQuestion(supabase: Client, questionId: string): Promise<QuestionVariant | null> {
   const { data } = await supabase
     .from("question_variants")
-    .select("question_id, question, answer_options, correct_answer, accepted_answers, explanation, test_rewordings!inner(status, activated_at)")
+    .select("id, question_id, question, answer_options, correct_answer, accepted_answers, explanation, test_rewordings!inner(status, activated_at)")
     .eq("question_id", questionId)
     .eq("test_rewordings.status", "active")
     .order("created_at", { ascending: false })

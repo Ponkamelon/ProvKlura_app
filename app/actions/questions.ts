@@ -77,13 +77,28 @@ export async function updateQuestionAction(
     .map((v) => String(v ?? "").trim())
     .filter(Boolean);
 
+  // Ny frågeversion när föräldern ändrar innehållet (steg 0). Kunskapspunkten
+  // är densamma, så elevens historik på punkten fortsätter räknas.
+  const { data: before } = await supabase
+    .from("questions")
+    .select("question, correct_answer, answer_options, version")
+    .eq("id", questionId)
+    .maybeSingle();
+  const newOptions = questionType === "multiple_choice" ? options : null;
+  const contentChanged =
+    !!before &&
+    (before.question !== question ||
+      before.correct_answer !== correctAnswer ||
+      JSON.stringify(before.answer_options ?? null) !== JSON.stringify(newOptions));
+
   await supabase
     .from("questions")
     .update({
+      ...(contentChanged ? { version: (before?.version ?? 1) + 1 } : {}),
       question,
       correct_answer: correctAnswer,
       explanation,
-      answer_options: questionType === "multiple_choice" ? options : null,
+      answer_options: newOptions,
       image_url: imageUrl || null,
       // En admin som manuellt redigerar en fråga har i praktiken granskat den.
       verification_status: "verified",
@@ -96,22 +111,34 @@ export async function updateQuestionAction(
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-/** Sektion 39: tilldela ett pluggprojekt till valda elever. */
+/**
+ * Sektion 39: tilldela ett pluggprojekt till valda elever. Befintliga
+ * tilldelningar behålls (med sina provdatum); bara av- och påkryssade
+ * elever ändras. Nya tilldelningar får setets provdatum som förval.
+ */
 export async function assignStudySetAction(studySetId: string, formData: FormData) {
   const { profile, supabase } = await assertOwnsStudySet(studySetId);
-  const studentIds = formData.getAll("studentIds").map(String).filter((id) => UUID_RE.test(id));
+  const studentIds = new Set(formData.getAll("studentIds").map(String).filter((id) => UUID_RE.test(id)));
 
-  // Enklast robusta sättet att hantera av/påmarkerade kryssrutor:
-  // nollställ tilldelningen och skriv om den utifrån vald lista.
-  await supabase.from("assignments").delete().eq("study_set_id", studySetId);
+  const [{ data: existing }, { data: studySet }] = await Promise.all([
+    supabase.from("assignments").select("id, student_id").eq("study_set_id", studySetId),
+    supabase.from("study_sets").select("exam_date").eq("id", studySetId).maybeSingle(),
+  ]);
+  const existingIds = new Set((existing ?? []).map((a) => a.student_id));
 
-  if (studentIds.length) {
-    const rows = studentIds.map((studentId) => ({
-      study_set_id: studySetId,
-      student_id: studentId,
-      assigned_by: profile.id,
-    }));
-    await supabase.from("assignments").insert(rows);
+  const removed = (existing ?? []).filter((a) => !studentIds.has(a.student_id)).map((a) => a.id);
+  if (removed.length) await supabase.from("assignments").delete().in("id", removed);
+
+  const added = [...studentIds].filter((id) => !existingIds.has(id));
+  if (added.length) {
+    await supabase.from("assignments").insert(
+      added.map((studentId) => ({
+        study_set_id: studySetId,
+        student_id: studentId,
+        assigned_by: profile.id,
+        exam_date: studySet?.exam_date ?? null,
+      })),
+    );
   }
 
   revalidatePath(`/admin/prov/${studySetId}`);

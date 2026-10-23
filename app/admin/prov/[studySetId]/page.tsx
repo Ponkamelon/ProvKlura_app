@@ -18,6 +18,8 @@ import { ConfirmSubmitButton } from "@/components/ConfirmSubmitButton";
 import type { Tables } from "@/lib/database.types";
 import { Icon } from "@/components/Icon";
 import { RenewalBanner } from "@/components/RenewalBanner";
+import { ExamDateForm } from "@/components/ExamDateForm";
+import { getSetAreas } from "@/lib/knowledge/points";
 import { getOpenRenewals } from "@/lib/renewal/requests";
 
 // regenerateQuestionsAction (Försök igen) kör samma AI-anrop som kan ta
@@ -76,7 +78,10 @@ export default async function StudySetReviewPage({
             .eq("role", "student")
             .order("display_name")
         : Promise.resolve({ data: [] as { id: string; display_name: string; grade_level: number }[] }),
-      supabase.from("assignments").select("student_id").eq("study_set_id", params.studySetId),
+      supabase
+        .from("assignments")
+        .select("id, student_id, exam_date, exam_areas")
+        .eq("study_set_id", params.studySetId),
       supabase
         .from("source_material")
         .select("*")
@@ -86,6 +91,8 @@ export default async function StudySetReviewPage({
 
   const renewals = await getOpenRenewals(supabase, profile.id, [params.studySetId]);
   const assignedIds = new Set(assignments?.map((a) => a.student_id));
+  const setAreas = (await getSetAreas(supabase, [params.studySetId])).get(params.studySetId) ?? [];
+  const studentNameById = new Map<string, string>((students ?? []).map((s) => [s.id, s.display_name]));
   const publishedCount = questions?.filter((q) => q.status === "published").length ?? 0;
   const highConfidenceDrafts =
     questions?.filter((q) => q.status === "draft" && q.verification_status === "verified") ?? [];
@@ -166,7 +173,29 @@ export default async function StudySetReviewPage({
               Spara tilldelning
             </button>
           </form>
-        ) : (
+        ) : null}
+
+        {students?.length && assignments?.length ? (
+          <div className="mt-6 border-t border-sand-deep pt-4">
+            <h3 className="font-medium text-navy">Provdatum</h3>
+            <p className="mt-1 text-sm text-navy/60">
+              Ange när eleven har prov. Varje elev kan ha sitt eget datum.
+            </p>
+            <div className="mt-3 space-y-2">
+              {assignments.map((a) => (
+                <ExamDateForm
+                  key={a.id}
+                  assignment={a}
+                  studentName={studentNameById.get(a.student_id)?.split(" ")[0] ?? "eleven"}
+                  areas={setAreas}
+                  returnPath={`/admin/prov/${params.studySetId}`}
+                />
+              ))}
+            </div>
+          </div>
+        ) : null}
+
+        {students?.length ? null : (
           <p className="mt-3 text-sm text-navy/60">
             Inga elever än.{" "}
             <Link href="/admin/elever/ny" className="text-ocean underline">

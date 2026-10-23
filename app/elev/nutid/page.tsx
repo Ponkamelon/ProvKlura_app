@@ -7,6 +7,7 @@ import { getCurrentKryss } from "@/lib/nutid/current";
 import { computeProgress, type AttemptRow } from "@/lib/nutid/progress";
 import { currentWeekStart, isoWeekNumber } from "@/lib/nutid/week";
 import { Icon } from "@/components/Icon";
+import { logEvent } from "@/lib/events/log";
 
 type AttemptWithKryss = AttemptRow & { kryss_id: string };
 
@@ -32,6 +33,7 @@ export default async function NutidPage() {
 
   const attempts = (rawAttempts ?? []) as AttemptWithKryss[];
   const progress = computeProgress(attempts);
+  await logEvent(supabase, "progress_viewed", { props: { page: "nutid" } });
   const attemptFor = (id: string) => attempts.find((a) => a.kryss_id === id);
   const currentAttempt = current ? attemptFor(current.id) : undefined;
   const questionCount = current?.entries.length ?? 0;

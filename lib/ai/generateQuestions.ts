@@ -20,6 +20,8 @@ export type GeneratedQuestion = {
   accepted_answers?: string[];
   explanation: string;
   knowledge_unit: string;
+  /** Vald kunskapspunkt ur listan, "Område › Punkt" — tom om ingen passar. */
+  knowledge_point?: string;
   importance: "high" | "medium" | "low";
   confidence_score: number;
 };
@@ -35,19 +37,24 @@ Grundregler:
 - Flervalsfrågor (multiple_choice): exakt 4 alternativ i "options", ett rätt och tre trovärdiga fel, ungefär lika långa. "correct_answer" måste vara IDENTISK, tecken för tecken, med ett av alternativen i "options".
 - Sant/falskt-frågor (true_false): "correct_answer" ska vara exakt "Sant" eller "Falskt".
 - Kortsvarsfrågor (short_answer): ge gärna alternativa godkända svar i "accepted_answers".
-- Ge varje fråga en "knowledge_unit" (vad eleven behöver kunna, kort fras) och "importance" ("high"/"medium"/"low" — sikta på ungefär 60% high, 30% medium, 10% low över hela frågebanken).
+- Ge varje fråga en "knowledge_unit" (vad eleven behöver kunna, kort fras) och en "knowledge_point": välj den punkt i listan "Kunskapspunkter" som frågan testar och skriv den exakt som den står ("Område › Punkt"). Passar ingen punkt, eller saknas listan, skriv tom sträng "". Ge också "importance" ("high"/"medium"/"low" — sikta på ungefär 60% high, 30% medium, 10% low över hela frågebanken).
 - "confidence_score": ett tal 0–1 som visar hur säker du är på att svaret verkligen stöds av materialet. Var ärlig — sätt lågt värde om materialet är otydligt.
 - Hellre färre bra frågor än många repetitiva. Riktvärde: normalt material 12–18 frågor, litet material 8–12. Skapa ALDRIG fler än 20 frågor totalt, oavsett hur stort materialet är — hellre välj ut det viktigaste än att svaret blir avklippt. Skapa inte dubbletter som testar exakt samma sak med olika ord.
 
-Svara ENDAST med en giltig JSON-array, inget annat — ingen inledande text, ingen markdown-kodruta. Varje objekt ska ha exakt fälten: question, type, options (endast för multiple_choice), correct_answer, accepted_answers (valfritt), explanation, knowledge_unit, importance, confidence_score.`;
+Svara ENDAST med en giltig JSON-array, inget annat — ingen inledande text, ingen markdown-kodruta. Varje objekt ska ha exakt fälten: question, type, options (endast för multiple_choice), correct_answer, accepted_answers (valfritt), explanation, knowledge_unit, knowledge_point, importance, confidence_score.`;
 
 export async function generateQuestionsFromText(params: {
   text: string;
   subjectName: string;
   chapterTitle: string;
   gradeLevel: number;
+  /** Kunskapspunkter att välja bland, som "Område › Punkt". */
+  knowledgePoints?: string[];
 }): Promise<GeneratedQuestion[]> {
   const { text, subjectName, chapterTitle, gradeLevel } = params;
+  const pointList = params.knowledgePoints?.length
+    ? `\n\nKunskapspunkter (välj en per fråga om någon passar):\n${params.knowledgePoints.map((p) => `- ${p}`).join("\n")}`
+    : "";
 
   const response = await anthropic.messages.create({
     // Snabbare modell för att hinna klart inom Vercel Hobby-planens
@@ -61,7 +68,7 @@ export async function generateQuestionsFromText(params: {
         role: "user",
         content: `Ämne: ${subjectName}
 Kapitel/provområde: ${chapterTitle}
-Årskurs: ${gradeLevel}
+Årskurs: ${gradeLevel}${pointList}
 
 Material:
 """

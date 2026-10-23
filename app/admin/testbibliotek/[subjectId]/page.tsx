@@ -13,6 +13,8 @@ import { Icon } from "@/components/Icon";
 import { RenewalDot } from "@/components/RenewalDot";
 import { RenewalBanner } from "@/components/RenewalBanner";
 import { getOpenRenewals, groupBySet } from "@/lib/renewal/requests";
+import { ExamDateForm } from "@/components/ExamDateForm";
+import { getSetAreas } from "@/lib/knowledge/points";
 
 type StudySetRow = {
   id: string;
@@ -85,10 +87,18 @@ export default async function TestbibliotekSubjectPage({
   const { data: existingAssignments } = studySetIds.length
     ? await supabase
         .from("assignments")
-        .select("id, study_set_id, student_id")
+        .select("id, study_set_id, student_id, exam_date, exam_areas")
         .eq("assigned_by", profile.id)
         .in("study_set_id", studySetIds)
-    : { data: [] as { id: string; study_set_id: string; student_id: string }[] };
+    : {
+        data: [] as {
+          id: string;
+          study_set_id: string;
+          student_id: string;
+          exam_date: string | null;
+          exam_areas: string[] | null;
+        }[],
+      };
 
   // Tester där föräldern har en aktiv omformulerad version.
   const { data: activeRewordings } = studySetIds.length
@@ -101,13 +111,15 @@ export default async function TestbibliotekSubjectPage({
     : { data: [] as { study_set_id: string }[] };
   const rewordedSetIds = new Set((activeRewordings ?? []).map((r) => r.study_set_id));
 
-  const studentNameById = new Map((students ?? []).map((s) => [s.id, s.display_name]));
+  const studentNameById = new Map<string, string>((students ?? []).map((s) => [s.id, s.display_name]));
   const renewalsBySet = groupBySet(await getOpenRenewals(supabase, profile.id, studySetIds));
+  const areasBySet = await getSetAreas(supabase, studySetIds);
 
-  const assignmentsBySet = new Map<string, { id: string; student_id: string }[]>();
+  type Share = { id: string; student_id: string; exam_date: string | null; exam_areas: string[] | null };
+  const assignmentsBySet = new Map<string, Share[]>();
   for (const a of existingAssignments ?? []) {
     const list = assignmentsBySet.get(a.study_set_id) ?? [];
-    list.push({ id: a.id, student_id: a.student_id });
+    list.push({ id: a.id, student_id: a.student_id, exam_date: a.exam_date, exam_areas: a.exam_areas });
     assignmentsBySet.set(a.study_set_id, list);
   }
 
@@ -187,6 +199,31 @@ export default async function TestbibliotekSubjectPage({
               </form>
             ))}
           </div>
+        )}
+
+        {!isWriting && shares.length > 0 && (
+          <details className="mt-3">
+            <summary className="cursor-pointer text-sm font-medium text-ocean">
+              Provdatum
+              {shares.some((s) => s.exam_date)
+                ? ` · ${shares
+                    .filter((s) => s.exam_date)
+                    .map((s) => `${(studentNameById.get(s.student_id) ?? "").split(" ")[0]} ${s.exam_date}`)
+                    .join(", ")}`
+                : " · inget satt"}
+            </summary>
+            <div className="mt-2 space-y-2">
+              {shares.map((share) => (
+                <ExamDateForm
+                  key={share.id}
+                  assignment={share}
+                  studentName={(studentNameById.get(share.student_id) ?? "eleven").split(" ")[0]}
+                  areas={areasBySet.get(set.id) ?? []}
+                  returnPath={`/admin/testbibliotek/${subjectId}`}
+                />
+              ))}
+            </div>
+          </details>
         )}
 
         {availableStudents.length > 0 ? (

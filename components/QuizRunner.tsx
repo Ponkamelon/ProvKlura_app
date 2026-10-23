@@ -7,6 +7,7 @@ import {
   startAttemptAction,
   submitAnswerAction,
   finishAttemptAction,
+  abandonAttemptAction,
 } from "@/app/actions/quiz";
 import { Medal, medalForPercent } from "@/components/Medal";
 import { Icon } from "@/components/Icon";
@@ -33,12 +34,15 @@ export function QuizRunner({
   questions,
   feedbackTiming = "immediate",
   canRequestRenewal = true,
+  mode = "test",
 }: {
   studySetId: string;
   questions: QuizQuestion[];
   feedbackTiming?: "immediate" | "end_of_test";
   /** Falskt för "Träna mina fel" — där räknas inte alla rätt som att kunna hela testet. */
   canRequestRenewal?: boolean;
+  /** Passets typ, sparas på passet och i händelseloggen. */
+  mode?: "test" | "short" | "mistakes" | "mixed";
 }) {
   const [attemptId, setAttemptId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -61,7 +65,12 @@ export function QuizRunner({
   const isLastQuestion = index + 1 >= questions.length;
 
   useEffect(() => {
-    startAttemptAction(studySetId, questions.length)
+    startAttemptAction({
+      studySetId,
+      questionIds: questions.map((q) => q.id),
+      mode,
+      source: "testsida",
+    })
       .then(setAttemptId)
       .finally(() => setLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -125,6 +134,8 @@ export function QuizRunner({
     ) {
       return;
     }
+    // Passet markeras som avbrutet (för mätningen) — svaren som redan getts finns kvar.
+    if (attemptId) void abandonAttemptAction(attemptId).catch(() => {});
     router.push(`/elev/plugga/${studySetId}`);
   }
 
