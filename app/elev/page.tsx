@@ -7,7 +7,7 @@ import { UpdatedBadge } from "@/components/UpdatedBadge";
 import { getUpdatedStudySetIds } from "@/lib/quiz/variants";
 import { Icon } from "@/components/Icon";
 import { StudyOverview } from "@/components/StudyOverview";
-import { parseOverview } from "@/lib/overview/streak";
+import { parseOverview } from "@/lib/overview/data";
 import { logEvent } from "@/lib/events/log";
 
 export default async function ElevDashboard() {
@@ -110,11 +110,16 @@ export default async function ElevDashboard() {
     .not("completed_at", "is", null);
   const nutidDone = (nutidDoneCount ?? 0) > 0;
 
-  // Svit (dagar med minst ett klart test), antal klara test och pluggtid. Går det inte att hämta visas nollor
+  // Dagar med minst ett klart test, antal klara test och pluggtid. Går det inte att hämta visas nollor
   // hellre än att sidan kraschar.
   const { data: overviewRaw, error: overviewError } = await supabase.rpc("my_study_overview");
   if (overviewError) console.error("Kunde inte hämta elevöversikt:", overviewError);
   const overview = parseOverview(overviewRaw);
+  const { data: goalRows } = await supabase
+    .from("weekly_goals")
+    .select("target_days, valid_from")
+    .eq("student_id", profile.id)
+    .order("valid_from");
 
   // Mätning (steg 0): besök på startsidan, så att startgraden kan räknas.
   await logEvent(supabase, "home_viewed");
@@ -125,7 +130,11 @@ export default async function ElevDashboard() {
         Hej {firstName}! 👋
       </h1>
 
-      <StudyOverview data={overview} today={stockholmTodayIso()} />
+      <StudyOverview
+        data={overview}
+        goals={(goalRows ?? []) as { target_days: number; valid_from: string }[]}
+        today={stockholmTodayIso()}
+      />
 
       {hasNationella && (
         <Link

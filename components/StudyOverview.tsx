@@ -1,28 +1,38 @@
-import type { OverviewData } from "@/lib/overview/streak";
-import { computeStreak, formatStudyTime, weekStrip } from "@/lib/overview/streak";
+import type { OverviewData } from "@/lib/overview/data";
+import { formatStudyTime, weekStrip } from "@/lib/overview/data";
+import { GOAL_CHOICES, weeklyGoalStatus, type GoalRow } from "@/lib/overview/weeklyGoal";
+import { setWeeklyGoalAction } from "@/app/actions/goals";
 
 /**
- * Elevens översikt på startsidan: svit (dagar i rad), antal klara test och
- * tid. En dag räknas i sviten när eleven gjort klart minst ett test — antal
- * rätt spelar ingen roll. Allt formulerat uppmuntrande — en bruten svit visas aldrig som ett
- * misslyckande, bara som en chans att starta en ny.
+ * Elevens översikt på startsidan: eget veckomål, antal klara test, tid och
+ * antal veckor med nått mål. En dag räknas när eleven gjort klart minst ett
+ * test — antal rätt spelar ingen roll. Missade dagar nollställer inget
+ * (kravspec avsnitt 2 och 4), så här finns ingen svit som kan brytas.
  */
-export function StudyOverview({ data, today }: { data: OverviewData; today: string }) {
-  const streak = computeStreak(data.days, today);
+export function StudyOverview({
+  data,
+  goals,
+  today,
+}: {
+  data: OverviewData;
+  goals: GoalRow[];
+  today: string;
+}) {
+  const goal = weeklyGoalStatus(data.days, goals, today);
   const time = formatStudyTime(data.seconds);
   const week = weekStrip(data.days, today);
 
   let message: string;
-  if (streak.activeToday && streak.current >= 2) {
-    message = `${streak.current} dagar i rad – snyggt jobbat!`;
-  } else if (streak.activeToday) {
-    message = "Bra jobbat idag! Gör klart ett test imorgon också, så har du en svit.";
-  } else if (streak.current > 0) {
-    message = `Gör klart ett test idag så blir det ${streak.current + 1} dagar i rad.`;
-  } else if (data.tests === 0) {
-    message = "Gör ditt första test – det tar bara några minuter.";
+  if (goal.target === null) {
+    message = "Välj ett veckomål: hur många dagar i veckan vill du göra klart ett test?";
+  } else if (goal.reached) {
+    message =
+      goal.doneThisWeek > goal.target
+        ? "Veckomålet är nått – och lite till! 🎉"
+        : "Veckomålet är nått! 🎉 Allt extra är bonus.";
   } else {
-    message = "Gör klart ett test idag så startar du en ny svit.";
+    const left = goal.target - goal.doneThisWeek;
+    message = `${left} ${left === 1 ? "dag" : "dagar"} kvar till veckomålet. Varje dag du gör klart ett test räknas.`;
   }
 
   return (
@@ -33,9 +43,9 @@ export function StudyOverview({ data, today }: { data: OverviewData; today: stri
 
       <dl className="grid grid-cols-4 gap-1 text-center">
         <Stat
-          emoji="🔥"
-          value={String(streak.current)}
-          label={streak.current === 1 ? "dag i rad" : "dagar i rad"}
+          emoji="🎯"
+          value={goal.target === null ? "–" : `${goal.doneThisWeek}/${goal.target}`}
+          label={goal.target === null ? "veckomål" : "dagar i veckan"}
           accent="text-coral"
         />
         <Stat
@@ -47,8 +57,8 @@ export function StudyOverview({ data, today }: { data: OverviewData; today: stri
         <Stat emoji="⏱️" value={time.value} label={`${time.unit} pluggat`} accent="text-ink" />
         <Stat
           emoji="🏆"
-          value={String(streak.best)}
-          label={streak.best === 1 ? "dags rekord" : "dagars rekord"}
+          value={String(goal.weeksReached)}
+          label={goal.weeksReached === 1 ? "vecka med nått mål" : "veckor med nått mål"}
           accent="text-navy"
         />
       </dl>
@@ -79,7 +89,50 @@ export function StudyOverview({ data, today }: { data: OverviewData; today: stri
       </ol>
 
       <p className="mt-3 text-sm text-navy">{message}</p>
+
+      {goal.target === null ? (
+        <GoalChoices current={null} />
+      ) : (
+        <details className="mt-2 text-sm">
+          <summary className="cursor-pointer text-ocean">Ändra veckomål</summary>
+          <GoalChoices current={goal.target} />
+        </details>
+      )}
     </section>
+  );
+}
+
+/** Knappar 1–5 dagar. Fungerar utan JavaScript (vanligt formulär). */
+function GoalChoices({ current }: { current: number | null }) {
+  return (
+    <form action={setWeeklyGoalAction} className="mt-2">
+      <fieldset>
+        <legend className="sr-only">Antal dagar i veckan</legend>
+        <div className="flex flex-wrap gap-2">
+          {GOAL_CHOICES.map((n) => (
+            <button
+              key={n}
+              type="submit"
+              name="target"
+              value={n}
+              aria-pressed={current === n}
+              className={`rounded-full border-2 px-3 py-1 text-sm font-medium transition-colors ${
+                current === n
+                  ? "border-coral bg-coral text-white"
+                  : n === 3 && current === null
+                    ? "border-coral bg-white text-navy hover:bg-coral/10"
+                    : "border-sand-deep bg-white/70 text-navy hover:border-coral"
+              }`}
+            >
+              {n} {n === 1 ? "dag" : "dagar"}
+            </button>
+          ))}
+        </div>
+        {current === null && (
+          <p className="mt-1 text-xs text-navy/60">Tre dagar i veckan är en bra start. Du kan ändra när du vill.</p>
+        )}
+      </fieldset>
+    </form>
   );
 }
 
