@@ -31,7 +31,7 @@ export function StudyOverview({ data, today }: { data: OverviewData; today: stri
         Din översikt
       </h2>
 
-      <dl className="grid grid-cols-3 gap-2 text-center">
+      <dl className="grid grid-cols-4 gap-1 text-center">
         <Stat
           emoji="🔥"
           value={String(streak.current)}
@@ -45,6 +45,12 @@ export function StudyOverview({ data, today }: { data: OverviewData; today: stri
           accent="text-ocean"
         />
         <Stat emoji="⏱️" value={time.value} label={`${time.unit} pluggat`} accent="text-ink" />
+        <Stat
+          emoji="🏆"
+          value={String(streak.best)}
+          label={streak.best === 1 ? "dags rekord" : "dagars rekord"}
+          accent="text-navy"
+        />
       </dl>
 
       <ol className="mt-4 flex justify-between gap-1 border-t border-sand-deep pt-3" aria-label="Den här veckan">
@@ -73,9 +79,6 @@ export function StudyOverview({ data, today }: { data: OverviewData; today: stri
       </ol>
 
       <p className="mt-3 text-sm text-navy">{message}</p>
-      {streak.best >= 2 && streak.best > streak.current && (
-        <p className="mt-1 text-xs text-navy/60">Ditt rekord: {streak.best} dagar i rad</p>
-      )}
     </section>
   );
 }
@@ -94,7 +97,7 @@ function Stat({
   return (
     <div className="flex flex-col items-center">
       <dt className="order-2 text-xs leading-tight text-navy/60">{label}</dt>
-      <dd className={`order-1 font-mono text-3xl font-medium leading-none ${accent}`}>
+      <dd className={`order-1 font-mono text-2xl font-medium leading-none sm:text-3xl ${accent}`}>
         <span aria-hidden="true" className="mb-1 block text-lg">
           {emoji}
         </span>

@@ -33,7 +33,7 @@ export default async function AdminLayout({
 
   return (
     <div className="min-h-screen bg-sand">
-      <header className="border-b border-sand-deep bg-white/60">
+      <header className="border-b border-sand-deep">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
           <div className="flex min-w-0 items-center gap-3 sm:gap-4">
             <Link

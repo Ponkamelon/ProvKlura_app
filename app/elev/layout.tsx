@@ -32,9 +32,13 @@ export default async function ElevLayout({
           </Link>
         </div>
         <div className="flex items-center gap-4">
-          <Link href="/elev/installningar" className="link-back text-navy/70">
-            <Icon name="installningar" size={16} />
-            Inställningar
+          <Link
+            href="/elev/installningar"
+            aria-label="Inställningar"
+            title="Inställningar"
+            className="flex h-9 w-9 items-center justify-center rounded-full text-navy/70 transition-colors hover:bg-seafoam hover:text-ocean-dark"
+          >
+            <Icon name="installningar" size={20} />
           </Link>
           <form action={signOutAction}>
             <button type="submit" className="link-back text-navy/70">

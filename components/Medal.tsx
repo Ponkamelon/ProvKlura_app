@@ -25,7 +25,8 @@ export function Medal({ tier, size = 96 }: { tier: MedalTier; size?: number }) {
 
   return (
     <Image
-      src={`/medals/${tier}.png`}
+      // Genomskinlig bakgrund, så medaljen ser rätt ut på både kort och sandbakgrund.
+      src={`/medals/medalj-${tier}.png`}
       alt={MEDAL_LABEL[tier]}
       width={size}
       height={height}
