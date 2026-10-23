@@ -5,6 +5,7 @@ import { requireProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { getVariantForQuestion } from "@/lib/quiz/variants";
 import { logEvent } from "@/lib/events/log";
+import { buildRoundSummary, type RoundSummary } from "@/lib/quiz/summary";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const MODES = ["test", "short", "mistakes", "mixed"] as const;
@@ -17,7 +18,8 @@ type Source = (typeof SOURCES)[number];
  * avbrutet pass går att återuppta och analysen vet vad eleven fick.
  */
 export async function startAttemptAction(params: {
-  studySetId: string;
+  /** null för blandad repetition över flera test. */
+  studySetId: string | null;
   questionIds: string[];
   mode?: Mode;
   source?: Source;
@@ -289,4 +291,76 @@ export async function resumeAttemptAction(attemptId: string) {
 export async function endPausedAttemptAction(attemptId: string) {
   await abandonAttemptAction(attemptId);
   revalidatePath("/elev");
+}
+
+/** Tydligt avslut: bygger insats, resultat och nästa steg från passets sparade svar. */
+export async function getRoundSummaryAction(attemptId: string): Promise<RoundSummary | null> {
+  const profile = await requireProfile("student");
+  const supabase = createClient();
+
+  const { data: attempt } = await supabase
+    .from("attempts")
+    .select("id, started_at, study_sets(title)")
+    .eq("id", attemptId)
+    .eq("student_id", profile.id)
+    .maybeSingle();
+  if (!attempt) return null;
+
+  const { data: rows } = await supabase
+    .from("answers")
+    .select("knowledge_point_id, correct, skipped, help_used, questions(study_set_id, difficulty), knowledge_points(name, area)")
+    .eq("attempt_id", attemptId);
+  type Row = {
+    knowledge_point_id: string | null;
+    correct: boolean | null;
+    skipped: boolean;
+    help_used: boolean;
+    questions: { study_set_id: string; difficulty: string | null } | null;
+    knowledge_points: { name: string; area: string } | null;
+  };
+  const answers = (rows ?? []) as unknown as Row[];
+
+  // Senaste tidigare svar (före passet) på samma punkter, utan hjälp.
+  const pointIds = [...new Set(answers.map((a) => a.knowledge_point_id).filter((x): x is string => !!x))];
+  const { data: priorRows } = pointIds.length
+    ? await supabase
+        .from("answers")
+        .select("knowledge_point_id, correct, created_at, questions(difficulty), attempts!inner(student_id)")
+        .eq("attempts.student_id", profile.id)
+        .in("knowledge_point_id", pointIds)
+        .eq("skipped", false)
+        .eq("help_used", false)
+        .lt("created_at", attempt.started_at)
+        .order("created_at", { ascending: false })
+        .limit(200)
+    : { data: [] };
+  const prior = new Map<string, { knowledgePointId: string; correct: boolean; difficulty: string | null }>();
+  for (const r of (priorRows ?? []) as unknown as {
+    knowledge_point_id: string;
+    correct: boolean | null;
+    questions: { difficulty: string | null } | null;
+  }[]) {
+    if (!prior.has(r.knowledge_point_id)) {
+      prior.set(r.knowledge_point_id, {
+        knowledgePointId: r.knowledge_point_id,
+        correct: r.correct === true,
+        difficulty: r.questions?.difficulty ?? null,
+      });
+    }
+  }
+
+  return buildRoundSummary({
+    answers: answers.map((a) => ({
+      knowledgePointId: a.knowledge_point_id,
+      pointName: a.knowledge_points?.name ?? null,
+      area: a.knowledge_points?.area ?? null,
+      correct: a.correct,
+      skipped: a.skipped,
+      helpUsed: a.help_used,
+      difficulty: a.questions?.difficulty ?? null,
+    })),
+    prior: [...prior.values()],
+    setTitle: (attempt.study_sets as unknown as { title: string } | null)?.title ?? null,
+    testCount: new Set(answers.map((a) => a.questions?.study_set_id).filter(Boolean)).size,
+  });
 }

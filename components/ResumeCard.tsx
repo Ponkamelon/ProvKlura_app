@@ -14,7 +14,11 @@ export function ResumeCard({ attempt }: { attempt: ResumableAttempt }) {
       className="notebook-card mt-6 border-l-4 border-ocean p-4"
     >
       <Link
-        href={`/elev/plugga/${attempt.studySetId}/quiz?fortsatt=${attempt.id}`}
+        href={
+          attempt.studySetId
+            ? `/elev/plugga/${attempt.studySetId}/quiz?fortsatt=${attempt.id}`
+            : `/elev/repetera?fortsatt=${attempt.id}`
+        }
         className="flex items-center justify-between gap-3"
       >
         <div>

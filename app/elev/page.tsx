@@ -12,8 +12,16 @@ import { logEvent } from "@/lib/events/log";
 import { hasFeature } from "@/lib/features";
 import { getResumableAttempt } from "@/lib/quiz/resume";
 import { ResumeCard } from "@/components/ResumeCard";
+import { TestCard } from "@/components/TestCard";
+import { getStudentQuizSets } from "@/lib/quiz/studentSets";
+import { getPointStatuses, countStatuses, type PointStatusRow } from "@/lib/knowledge/status";
+import { duePoints, MIXED_ROUND_SIZE } from "@/lib/quiz/mixedRound";
+import { compareByExam, daysUntil, examLabel } from "@/lib/quiz/examDate";
 
-export default async function ElevDashboard() {
+/** Högst så här många testkort visas direkt (kravspec avsnitt 2). */
+const CARDS_SHOWN = 3;
+
+export default async function ElevDashboard({ searchParams }: { searchParams: { alla?: string } }) {
   const profile = await requireProfile("student");
   const supabase = createClient();
 
@@ -125,12 +133,124 @@ export default async function ElevDashboard() {
     .order("valid_from");
 
   // "Fortsätt där du var" — förhandsfunktion tills nuläget är uppmätt.
-  const resumable = (await hasFeature(supabase, profile.id, "fortsatt"))
+  const stepOne = await hasFeature(supabase, profile.id, "steg1");
+  const resumable = stepOne || (await hasFeature(supabase, profile.id, "fortsatt"))
     ? await getResumableAttempt(supabase, profile.id)
     : null;
 
   // Mätning (steg 0): besök på startsidan, så att startgraden kan räknas.
   await logEvent(supabase, "home_viewed");
+
+  // Steg 1 (förhandsfunktion): startsidan utgår från elevens tilldelade test.
+  if (stepOne) {
+    const today = stockholmTodayIso();
+    const sets = (await getStudentQuizSets(supabase, profile.id)).sort((a, b) => compareByExam(a, b, today));
+    const points = await getPointStatuses(supabase, sets.map((s) => s.id));
+    const pointsBySet = new Map<string, PointStatusRow[]>();
+    for (const p of points) pointsBySet.set(p.study_set_id, [...(pointsBySet.get(p.study_set_id) ?? []), p]);
+    const dueCount = Math.min(duePoints(points).length, MIXED_ROUND_SIZE);
+    const showAll = searchParams.alla === "1";
+    const shown = showAll ? sets : sets.slice(0, CARDS_SHOWN);
+    const updatedIds = await getUpdatedStudySetIds(supabase, profile.id, sets.map((s) => s.id));
+
+    return (
+      <div>
+        <h1 className="font-display text-2xl font-semibold text-navy">Hej {firstName}! 👋</h1>
+
+        {resumable && <ResumeCard attempt={resumable} />}
+
+        <StudyOverview
+          data={overview}
+          goals={(goalRows ?? []) as { target_days: number; valid_from: string }[]}
+          today={today}
+        />
+
+        <section className="mt-8" aria-labelledby="mina-prov">
+          <h2 id="mina-prov" className="text-xs font-semibold uppercase tracking-wide text-navy/60">
+            Mina prov
+          </h2>
+          {sets.length ? (
+            <div className="mt-3 space-y-3">
+              {shown.map((s) => (
+                <TestCard
+                  key={s.id}
+                  id={s.id}
+                  title={s.title}
+                  subject={s.subject}
+                  examText={examLabel(s.examDate, today)}
+                  examSoon={!!s.examDate && daysUntil(s.examDate, today) >= 0 && daysUntil(s.examDate, today) <= 7}
+                  counts={countStatuses(pointsBySet.get(s.id) ?? [])}
+                  updated={updatedIds.has(s.id)}
+                />
+              ))}
+            </div>
+          ) : (
+            <p className="mt-3 text-navy/70">
+              Inga test tilldelade än. När din förälder eller lärare delar ett test dyker det upp här.
+            </p>
+          )}
+          {sets.length > CARDS_SHOWN && (
+            <Link
+              href={showAll ? "/elev" : "/elev?alla=1"}
+              className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-ocean hover:underline"
+            >
+              {showAll ? "Visa färre" : `Visa alla (${sets.length - CARDS_SHOWN} till)`}
+              <Icon name="nasta" size={16} />
+            </Link>
+          )}
+        </section>
+
+        {dueCount > 0 && (
+          <Link
+            href="/elev/repetera"
+            className="mt-4 flex items-center justify-between gap-3 rounded-xl border border-sand-deep bg-white/50 px-4 py-3 text-sm text-navy transition-colors hover:bg-white/80"
+          >
+            <span>
+              Repetera blandat · {dueCount} {dueCount === 1 ? "sak" : "saker"}
+            </span>
+            <Icon name="nasta" size={16} className="text-navy/40" />
+          </Link>
+        )}
+
+        <div className="mt-8 space-y-3">
+          <Link
+            href="/elev/nutid"
+            className="nutid-card flex items-center justify-between gap-3 p-4 transition-transform hover:-translate-y-0.5"
+          >
+            <div>
+              <p className="font-medium text-navy">Veckans nutidskryss 📰</p>
+              <p className="text-sm text-navy/60">
+                {nutidDone ? "Klart för veckan! Titta på din nutidskoll" : "Tio frågor om veckans nyheter — 1, X eller 2"}
+              </p>
+            </div>
+            <Icon name="nasta" className="text-navy/40" />
+          </Link>
+          {hasSkrivklura && (
+            <Link
+              href="/elev/skrivklura"
+              className="skriv-card flex items-center justify-between gap-3 p-4 transition-transform hover:-translate-y-0.5"
+            >
+              <div>
+                <p className="font-medium text-navy">Skrivklura</p>
+                <p className="text-sm text-navy/60">Träna på att skriva, en liten bit i taget</p>
+              </div>
+              <Icon name="nasta" className="text-navy/40" />
+            </Link>
+          )}
+          <Link
+            href="/elev/ideverkstad"
+            className="skriv-card flex items-center justify-between gap-3 p-4 transition-transform hover:-translate-y-0.5"
+          >
+            <div>
+              <p className="font-medium text-navy">Idéverkstad ✨</p>
+              <p className="text-sm text-navy/60">Svara på några frågor och få idéer till din text</p>
+            </div>
+            <Icon name="nasta" className="text-navy/40" />
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div>

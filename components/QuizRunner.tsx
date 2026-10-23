@@ -10,7 +10,9 @@ import {
   abandonAttemptAction,
   pauseAttemptAction,
   resumeAttemptAction,
+  getRoundSummaryAction,
 } from "@/app/actions/quiz";
+import type { RoundSummary } from "@/lib/quiz/summary";
 import { Medal, medalForPercent } from "@/components/Medal";
 import { Icon } from "@/components/Icon";
 import { RenewalRequestButton } from "@/components/RenewalRequestButton";
@@ -39,8 +41,11 @@ export function QuizRunner({
   mode = "test",
   canPause = false,
   resume,
+  source = "testsida",
+  showSummary = false,
 }: {
-  studySetId: string;
+  /** null för blandad repetition, som hämtar frågor från flera test. */
+  studySetId: string | null;
   questions: QuizQuestion[];
   feedbackTiming?: "immediate" | "end_of_test";
   /** Falskt för "Träna mina fel" — där räknas inte alla rätt som att kunna hela testet. */
@@ -51,6 +56,10 @@ export function QuizRunner({
   canPause?: boolean;
   /** Ett pausat pass som återupptas: passets id och svaren som redan getts. */
   resume?: { attemptId: string; answered: AnsweredRecord[] };
+  /** Var passet startades (mätning): testsida, testkort eller rekommendation. */
+  source?: "testsida" | "testkort" | "rekommendation";
+  /** Tydligt avslut med insats, resultat och nästa steg (steg 1). */
+  showSummary?: boolean;
 }) {
   const answeredIds = new Set(resume?.answered.map((a) => a.id) ?? []);
   const firstOpen = resume ? questions.findIndex((q) => !answeredIds.has(q.id)) : 0;
@@ -64,6 +73,9 @@ export function QuizRunner({
   const [submitting, setSubmitting] = useState(false);
   const [answered, setAnswered] = useState<AnsweredRecord[]>(resume?.answered ?? []);
   const [pausing, setPausing] = useState(false);
+  const [summary, setSummary] = useState<RoundSummary | null>(null);
+  const [summaryFailed, setSummaryFailed] = useState(false);
+  const backHref = studySetId ? `/elev/plugga/${studySetId}` : "/elev";
   const router = useRouter();
 
   // Ref istället för bara state för den l\u00f6pande po\u00e4ngen: i "efter test"-
@@ -89,7 +101,7 @@ export function QuizRunner({
       studySetId,
       questionIds: questions.map((q) => q.id),
       mode,
-      source: "testsida",
+      source,
     })
       .then(setAttemptId)
       .finally(() => setLoading(false));
@@ -99,6 +111,14 @@ export function QuizRunner({
   useEffect(() => {
     setStartedAt(Date.now());
   }, [index]);
+
+  // Tydligt avslut: hämtas från de sparade svaren när passet är klart.
+  useEffect(() => {
+    if (!finished || !showSummary || !attemptId) return;
+    getRoundSummaryAction(attemptId)
+      .then((s) => (s ? setSummary(s) : setSummaryFailed(true)))
+      .catch(() => setSummaryFailed(true));
+  }, [finished, showSummary, attemptId]);
 
   async function recordAnswer(): Promise<Feedback | null> {
     if (!attemptId || !selected) return null;
@@ -167,7 +187,7 @@ export function QuizRunner({
     }
     // Passet markeras som avbrutet (för mätningen) — svaren som redan getts finns kvar.
     if (attemptId) void abandonAttemptAction(attemptId).catch(() => {});
-    router.push(`/elev/plugga/${studySetId}`);
+    router.push(backHref);
   }
 
   if (loading) {
@@ -187,14 +207,42 @@ export function QuizRunner({
           <p className="mt-2 font-mono text-2xl font-semibold text-ocean">
             {percent}%
           </p>
-          <p className="mt-4 text-navy/70">
-            {percent >= 70
-              ? "Bra koll! Repetera det du missade när du vill. 🎉"
-              : "Bra jobbat — fortsätt träna det svåra."}
-          </p>
+          {!showSummary && (
+            <p className="mt-4 text-navy/70">
+              {percent >= 70
+                ? "Bra koll! Repetera det du missade när du vill. 🎉"
+                : "Bra jobbat — fortsätt träna det svåra."}
+            </p>
+          )}
         </div>
 
-        {percent === 100 && canRequestRenewal && (
+        {showSummary && (
+          <section className="notebook-card mt-6 p-5" aria-live="polite">
+            <h2 className="sr-only">Sammanfattning</h2>
+            {summary ? (
+              <ul className="space-y-3 text-navy">
+                <li className="flex gap-3">
+                  <span aria-hidden="true">💪</span>
+                  <span>{summary.effort}</span>
+                </li>
+                <li className="flex gap-3">
+                  <span aria-hidden="true">✅</span>
+                  <span>{summary.result}</span>
+                </li>
+                <li className="flex gap-3">
+                  <span aria-hidden="true">➡️</span>
+                  <span>{summary.next}</span>
+                </li>
+              </ul>
+            ) : summaryFailed ? (
+              <p className="text-sm text-navy/70">Dina svar är sparade.</p>
+            ) : (
+              <p className="text-sm text-navy/50">Sammanfattar…</p>
+            )}
+          </section>
+        )}
+
+        {percent === 100 && canRequestRenewal && studySetId && (
           <div className="notebook-card mt-6 p-5 text-center">
             <p className="font-display text-lg font-semibold text-navy">Alla rätt! 🏆</p>
             <p className="mt-1 text-sm text-navy/70">
@@ -236,13 +284,23 @@ export function QuizRunner({
           </div>
         )}
 
-        <div className="mt-6 text-center">
-          <Link
-            href={`/elev/plugga/${studySetId}`}
-            className="btn-primary inline-flex"
-          >
-            Klar
-          </Link>
+        <div className="mt-6 flex flex-col items-center gap-3">
+          {showSummary ? (
+            <>
+              <Link href="/elev" className="btn-primary inline-flex">
+                Klar för idag
+              </Link>
+              {studySetId && (
+                <Link href={backHref} className="text-sm text-ocean underline">
+                  Tillbaka till testet
+                </Link>
+              )}
+            </>
+          ) : (
+            <Link href={backHref} className="btn-primary inline-flex">
+              Klar
+            </Link>
+          )}
         </div>
       </div>
     );
@@ -282,7 +340,7 @@ export function QuizRunner({
           </button>
         )}
         <p className="font-mono text-sm text-navy/50">
-          {index + 1} / {questions.length}
+          {showSummary ? `Fråga ${index + 1} av ${questions.length}` : `${index + 1} / ${questions.length}`}
         </p>
         <span className="w-12" />
       </div>

@@ -6,7 +6,8 @@ type Client = ReturnType<typeof import("@/lib/supabase/server").createClient>;
  */
 export type ResumableAttempt = {
   id: string;
-  studySetId: string;
+  /** null för blandad repetition. */
+  studySetId: string | null;
   title: string;
   answered: number;
   total: number;
@@ -20,7 +21,7 @@ export async function getResumableAttempt(supabase: Client, studentId: string): 
   const since = new Date(Date.now() - MAX_AGE_DAYS * 86400000).toISOString();
   const { data } = await supabase
     .from("attempts")
-    .select("id, study_set_id, status, question_ids, last_activity_at, answers(count), study_sets(title)")
+    .select("id, study_set_id, mode, status, question_ids, last_activity_at, answers(count), study_sets(title)")
     .eq("student_id", studentId)
     .in("status", ["paused", "active"])
     .is("completed_at", null)
@@ -31,7 +32,8 @@ export async function getResumableAttempt(supabase: Client, studentId: string): 
 
   for (const row of (data ?? []) as unknown as {
     id: string;
-    study_set_id: string;
+    study_set_id: string | null;
+    mode: string;
     status: string;
     question_ids: string[];
     last_activity_at: string;
@@ -40,10 +42,17 @@ export async function getResumableAttempt(supabase: Client, studentId: string): 
   }[]) {
     const answered = row.answers?.[0]?.count ?? 0;
     const total = row.question_ids.length;
-    if (!row.study_sets || answered >= total) continue;
+    const isMixed = row.mode === "mixed" && !row.study_set_id;
+    if ((!row.study_sets && !isMixed) || answered >= total) continue;
     // Ett pass som bara startades och lämnades utan svar är inget att fortsätta på.
     if (row.status === "active" && (answered === 0 || Date.now() - Date.parse(row.last_activity_at) < ACTIVE_IDLE_MS)) continue;
-    return { id: row.id, studySetId: row.study_set_id, title: row.study_sets.title, answered, total };
+    return {
+      id: row.id,
+      studySetId: row.study_set_id,
+      title: isMixed ? "Repetera blandat" : row.study_sets!.title,
+      answered,
+      total,
+    };
   }
   return null;
 }

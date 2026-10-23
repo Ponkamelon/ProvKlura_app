@@ -10,6 +10,9 @@ import {
 } from "@/lib/quiz/selection";
 import { getVariantsForStudySet } from "@/lib/quiz/variants";
 import { hasFeature } from "@/lib/features";
+import { getPointStatuses } from "@/lib/knowledge/status";
+import { selectShortRound } from "@/lib/quiz/shortRound";
+import { loadResumedAttempt } from "@/lib/quiz/loadResumed";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -28,11 +31,15 @@ export default async function QuizPage({
   searchParams,
 }: {
   params: { studySetId: string };
-  searchParams: { length?: string; mode?: string; fortsatt?: string };
+  searchParams: { length?: string; mode?: string; fortsatt?: string; runda?: string; kalla?: string };
 }) {
   const profile = await requireProfile("student");
   const supabase = createClient();
-  const canPause = await hasFeature(supabase, profile.id, "fortsatt");
+  const stepOne = await hasFeature(supabase, profile.id, "steg1");
+  const canPause = stepOne || (await hasFeature(supabase, profile.id, "fortsatt"));
+  const source = stepOne && (searchParams.kalla === "testkort" || searchParams.kalla === "rekommendation")
+    ? searchParams.kalla
+    : "testsida";
 
   // "Fortsätt där du var": samma pass, samma frågor i samma ordning.
   if (canPause && searchParams.fortsatt && UUID_RE.test(searchParams.fortsatt)) {
@@ -47,6 +54,7 @@ export default async function QuizPage({
           mode={resumed.mode}
           canPause
           resume={resumed.resume}
+          showSummary={stepOne}
         />
       );
     }
@@ -94,8 +102,39 @@ export default async function QuizPage({
   );
 
   let pool = allQuestions;
+  let mode: "test" | "short" | "mistakes" = searchParams.mode === "mistakes" ? "mistakes" : "test";
 
-  if (searchParams.mode === "mistakes") {
+  if (stepOne && searchParams.runda === "kort" && searchParams.mode !== "mistakes") {
+    // Kort runda: fem frågor enligt 2+2+1 (kravspec avsnitt 5).
+    mode = "short";
+    const [{ data: kpRows }, points, { data: lastRound }] = await Promise.all([
+      supabase.from("questions").select("id, knowledge_point_id").in("id", allQuestions.map((q) => q.id)),
+      getPointStatuses(supabase, [params.studySetId]),
+      supabase
+        .from("attempts")
+        .select("question_ids")
+        .eq("student_id", profile.id)
+        .eq("study_set_id", params.studySetId)
+        .eq("mode", "short")
+        .order("started_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+    ]);
+    const pointByQuestion = new Map<string, string | null>(
+      (kpRows ?? []).map((r) => [r.id as string, (r.knowledge_point_id as string | null) ?? null]),
+    );
+    const ids = selectShortRound(
+      allQuestions.map((q) => ({
+        id: q.id,
+        knowledge_point_id: pointByQuestion.get(q.id) ?? null,
+        last_answered: progressMap.get(q.id)?.last_answered ?? null,
+      })),
+      points,
+      ((lastRound?.question_ids ?? []) as string[]),
+    );
+    const byId = new Map(allQuestions.map((q) => [q.id, q]));
+    pool = ids.map((id) => byId.get(id)).filter((q): q is QuestionRow => !!q);
+  } else if (searchParams.mode === "mistakes") {
     pool = shuffle(
       pool.filter((q) => progressMap.get(q.id)?.mastery_level === "needs_practice"),
     );
@@ -103,7 +142,8 @@ export default async function QuizPage({
   } else {
     // Adaptivt urval ur hela poolen (sektion 46): tidigare fel får förtur,
     // otestat dras oftare än det eleven redan kan, och ordningen blandas.
-    const length = Number(searchParams.length) || 10;
+    // "Hela testet" (length=alla) tar alla frågor i blandad ordning.
+    const length = searchParams.length === "alla" ? pool.length : Number(searchParams.length) || 10;
     pool = selectQuestions(pool, progressMap, length);
   }
 
@@ -128,84 +168,11 @@ export default async function QuizPage({
       studySetId={params.studySetId}
       questions={preparedQuestions}
       feedbackTiming={feedbackTiming}
-      canRequestRenewal={searchParams.mode !== "mistakes"}
-      mode={searchParams.mode === "mistakes" ? "mistakes" : "test"}
+      canRequestRenewal={mode === "test"}
+      mode={mode}
       canPause={canPause}
+      source={source}
+      showSummary={stepOne}
     />
   );
-}
-
-type Client = ReturnType<typeof createClient>;
-type Mode = "test" | "short" | "mistakes" | "mixed";
-
-/** Laddar ett pausat pass: frågelistan, de svar som redan getts och poängen hittills. */
-async function loadResumedAttempt(supabase: Client, studentId: string, studySetId: string, attemptId: string) {
-  const { data: attempt } = await supabase
-    .from("attempts")
-    .select("id, study_set_id, question_ids, mode, status, completed_at")
-    .eq("id", attemptId)
-    .eq("student_id", studentId)
-    .eq("study_set_id", studySetId)
-    .maybeSingle();
-  if (!attempt || attempt.completed_at || !["paused", "active"].includes(attempt.status)) return null;
-  const ids = (attempt.question_ids ?? []) as string[];
-  if (!ids.length) return null;
-
-  const [{ data: rows }, { data: answers }, { data: prefs }, { variants }] = await Promise.all([
-    supabase
-      .from("questions")
-      .select("id, question, question_type, answer_options, image_url, correct_answer, explanation")
-      .in("id", ids),
-    supabase
-      .from("answers")
-      .select("question_id, selected_answer, correct, skipped, created_at")
-      .eq("attempt_id", attempt.id)
-      .order("created_at"),
-    supabase.from("student_preferences").select("feedback_timing").eq("student_id", studentId).maybeSingle(),
-    getVariantsForStudySet(supabase, studySetId),
-  ]);
-
-  type Row = QuestionRow & { correct_answer: string; explanation: string | null };
-  const byId = new Map(((rows ?? []) as unknown as Row[]).map((q) => [q.id, q]));
-  const ordered = ids.map((id) => byId.get(id)).filter((q): q is Row => !!q);
-
-  const questions = ordered.map((q) => {
-    const variant = variants.get(q.id);
-    const options = variant?.answer_options ?? q.answer_options;
-    return {
-      id: q.id,
-      question: variant?.question ?? q.question,
-      question_type: q.question_type,
-      answer_options: Array.isArray(options) ? shuffleOptions(options as string[]) : null,
-      image_url: q.image_url ?? null,
-    };
-  });
-  const questionById = new Map(questions.map((q) => [q.id, q]));
-
-  const answered = (answers ?? [])
-    .filter((a) => questionById.has(a.question_id))
-    .map((a) => {
-      const q = byId.get(a.question_id)!;
-      const variant = variants.get(a.question_id);
-      return {
-        ...questionById.get(a.question_id)!,
-        correct: a.correct === true,
-        correctAnswer: variant?.correct_answer ?? q.correct_answer,
-        explanation: variant?.explanation ?? q.explanation,
-        selectedAnswer: a.selected_answer ?? "",
-      };
-    });
-
-  const mode: Mode = (["test", "short", "mistakes", "mixed"] as const).includes(attempt.mode as Mode)
-    ? (attempt.mode as Mode)
-    : "test";
-
-  return {
-    questions,
-    mode,
-    feedbackTiming: (prefs?.feedback_timing === "end_of_test" ? "end_of_test" : "immediate") as
-      | "end_of_test"
-      | "immediate",
-    resume: { attemptId: attempt.id as string, answered },
-  };
 }
