@@ -8,6 +8,8 @@ import {
   submitAnswerAction,
   finishAttemptAction,
   abandonAttemptAction,
+  pauseAttemptAction,
+  resumeAttemptAction,
 } from "@/app/actions/quiz";
 import { Medal, medalForPercent } from "@/components/Medal";
 import { Icon } from "@/components/Icon";
@@ -35,6 +37,8 @@ export function QuizRunner({
   feedbackTiming = "immediate",
   canRequestRenewal = true,
   mode = "test",
+  canPause = false,
+  resume,
 }: {
   studySetId: string;
   questions: QuizQuestion[];
@@ -43,28 +47,44 @@ export function QuizRunner({
   canRequestRenewal?: boolean;
   /** Passets typ, sparas på passet och i händelseloggen. */
   mode?: "test" | "short" | "mistakes" | "mixed";
+  /** Eleven kan pausa och fortsätta senare (förhandsfunktion "fortsatt"). */
+  canPause?: boolean;
+  /** Ett pausat pass som återupptas: passets id och svaren som redan getts. */
+  resume?: { attemptId: string; answered: AnsweredRecord[] };
 }) {
-  const [attemptId, setAttemptId] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [index, setIndex] = useState(0);
+  const answeredIds = new Set(resume?.answered.map((a) => a.id) ?? []);
+  const firstOpen = resume ? questions.findIndex((q) => !answeredIds.has(q.id)) : 0;
+  const [attemptId, setAttemptId] = useState<string | null>(resume?.attemptId ?? null);
+  const [loading, setLoading] = useState(!resume);
+  const [index, setIndex] = useState(firstOpen === -1 ? questions.length - 1 : firstOpen);
   const [selected, setSelected] = useState("");
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [startedAt, setStartedAt] = useState(Date.now());
   const [finished, setFinished] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [answered, setAnswered] = useState<AnsweredRecord[]>([]);
+  const [answered, setAnswered] = useState<AnsweredRecord[]>(resume?.answered ?? []);
+  const [pausing, setPausing] = useState(false);
   const router = useRouter();
 
   // Ref istället för bara state för den l\u00f6pande po\u00e4ngen: i "efter test"-
   // l\u00e4get sker r\u00e4ttning och avancering i samma klick, och d\u00e5 hinner React
   // inte alltid f\u00e4rdigst\u00e4lla en state-uppdatering innan v\u00e4rdet l\u00e4ses igen.
-  const correctCountRef = useRef(0);
+  const correctCountRef = useRef(resume?.answered.filter((a) => a.correct).length ?? 0);
 
   const current = questions[index];
   const showImmediateFeedback = feedbackTiming === "immediate";
   const isLastQuestion = index + 1 >= questions.length;
 
   useEffect(() => {
+    if (resume) {
+      // Alla frågor besvarade men passet aldrig avslutat: visa resultatet direkt.
+      if (firstOpen === -1) {
+        void finishAttemptAction(resume.attemptId).finally(() => setFinished(true));
+      } else {
+        void resumeAttemptAction(resume.attemptId).catch(() => {});
+      }
+      return;
+    }
     startAttemptAction({
       studySetId,
       questionIds: questions.map((q) => q.id),
@@ -124,6 +144,17 @@ export function QuizRunner({
     } finally {
       setSubmitting(false);
     }
+  }
+
+  async function handlePause() {
+    if (pausing) return;
+    setPausing(true);
+    try {
+      if (attemptId) await pauseAttemptAction(attemptId);
+    } catch {
+      // Svaren är redan sparade — passet går att hitta ändå.
+    }
+    router.push("/elev");
   }
 
   function handleCancel() {
@@ -230,14 +261,26 @@ export function QuizRunner({
   return (
     <div>
       <div className="flex items-center justify-between">
-        <button
-          type="button"
-          onClick={handleCancel}
-          className="link-back text-navy/60"
-        >
-          <Icon name="avbryt" size={16} />
-          Avbryt
-        </button>
+        {canPause ? (
+          <button
+            type="button"
+            onClick={handlePause}
+            disabled={pausing}
+            className="link-back text-navy/60 disabled:opacity-50"
+          >
+            <Icon name="pausa" size={16} />
+            {pausing ? "Pausar…" : "Pausa"}
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={handleCancel}
+            className="link-back text-navy/60"
+          >
+            <Icon name="avbryt" size={16} />
+            Avbryt
+          </button>
+        )}
         <p className="font-mono text-sm text-navy/50">
           {index + 1} / {questions.length}
         </p>

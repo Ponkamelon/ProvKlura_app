@@ -9,6 +9,9 @@ import { Icon } from "@/components/Icon";
 import { StudyOverview } from "@/components/StudyOverview";
 import { parseOverview } from "@/lib/overview/data";
 import { logEvent } from "@/lib/events/log";
+import { hasFeature } from "@/lib/features";
+import { getResumableAttempt } from "@/lib/quiz/resume";
+import { ResumeCard } from "@/components/ResumeCard";
 
 export default async function ElevDashboard() {
   const profile = await requireProfile("student");
@@ -121,6 +124,11 @@ export default async function ElevDashboard() {
     .eq("student_id", profile.id)
     .order("valid_from");
 
+  // "Fortsätt där du var" — förhandsfunktion tills nuläget är uppmätt.
+  const resumable = (await hasFeature(supabase, profile.id, "fortsatt"))
+    ? await getResumableAttempt(supabase, profile.id)
+    : null;
+
   // Mätning (steg 0): besök på startsidan, så att startgraden kan räknas.
   await logEvent(supabase, "home_viewed");
 
@@ -129,6 +137,8 @@ export default async function ElevDashboard() {
       <h1 className="font-display text-2xl font-semibold text-navy">
         Hej {firstName}! 👋
       </h1>
+
+      {resumable && <ResumeCard attempt={resumable} />}
 
       <StudyOverview
         data={overview}

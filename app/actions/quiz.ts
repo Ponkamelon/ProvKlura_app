@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { requireProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { getVariantForQuestion } from "@/lib/quiz/variants";
@@ -241,4 +242,51 @@ export async function abandonAttemptAction(attemptId: string) {
     studySetId: attempt.study_set_id,
     props: { mode: attempt.mode, question_count: attempt.total_questions ?? 0, answered_count: answered },
   });
+}
+
+/** Eleven pausar passet. Svaren finns kvar och passet kan återupptas från startsidan. */
+export async function pauseAttemptAction(attemptId: string) {
+  const profile = await requireProfile("student");
+  const supabase = createClient();
+
+  const { data: attempt } = await supabase
+    .from("attempts")
+    .select("id, study_set_id, mode, source, total_questions, status, answers(count)")
+    .eq("id", attemptId)
+    .eq("student_id", profile.id)
+    .maybeSingle();
+  if (!attempt || attempt.status === "completed" || attempt.status === "abandoned") return;
+
+  const now = new Date().toISOString();
+  await supabase
+    .from("attempts")
+    .update({ status: "paused", paused_at: now, last_activity_at: now })
+    .eq("id", attemptId);
+
+  const answered = (attempt.answers as unknown as { count: number }[] | null)?.[0]?.count ?? 0;
+  await logEvent(supabase, "session_paused", {
+    sessionId: attemptId,
+    source: attempt.source,
+    studySetId: attempt.study_set_id,
+    props: { mode: attempt.mode, question_count: attempt.total_questions ?? 0, answered_count: answered },
+  });
+  revalidatePath("/elev");
+}
+
+/** Ett pausat pass öppnas igen. Samma pass-id, så det räknas som ett och samma pass. */
+export async function resumeAttemptAction(attemptId: string) {
+  const profile = await requireProfile("student");
+  const supabase = createClient();
+  await supabase
+    .from("attempts")
+    .update({ status: "active", last_activity_at: new Date().toISOString() })
+    .eq("id", attemptId)
+    .eq("student_id", profile.id)
+    .in("status", ["paused", "active"]);
+}
+
+/** "Avsluta passet" från startsidan: eleven vill inte fortsätta. Svaren finns kvar. */
+export async function endPausedAttemptAction(attemptId: string) {
+  await abandonAttemptAction(attemptId);
+  revalidatePath("/elev");
 }
