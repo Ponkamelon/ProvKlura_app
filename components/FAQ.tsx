@@ -2,7 +2,12 @@
 
 import { useState } from "react";
 
-type FAQItem = { question: string; answer: string };
+type FAQItem = {
+  question: string;
+  answer: string;
+  /** Länk till källan, visas under svaret. */
+  source?: { label: string; href: string };
+};
 
 const FAQ_ITEMS: FAQItem[] = [
   {
@@ -34,6 +39,18 @@ const FAQ_ITEMS: FAQItem[] = [
     question: "Fungerar det för barn som har svårt att sitta still eller fokusera länge?",
     answer:
       "Ja. Studiepassen är korta som standard, en fråga i taget, inget som stjäl fokus. Du kan anpassa upplevelsen efter ditt barns behov — mindre text, lugnare gränssnitt, färre distraktioner, mer förutsägbart flöde.",
+  },
+  {
+    question: "Bygger ProvKlura på forskning?",
+    answer:
+      "Ja, på forskning om hur man lär sig bäst. Det amerikanska utbildningsdepartementets forskningsinstitut (IES) har gått igenom forskningen i vägledningen \"Organizing Instruction and Study to Improve Student Learning\". Den rekommenderar bland annat två saker: att sprida ut träningen över tid i stället för att plugga allt på en gång, och att använda korta förhörsfrågor som ett sätt att lära sig, inte bara för att kontrollera. Därför är passen korta och frågorna kommer tillbaka. Exakt när en fråga dyker upp igen är däremot vårt eget val. Det utvärderar vi och justerar efter hand.",
+    source: { label: "IES, ies.ed.gov", href: "https://ies.ed.gov" },
+  },
+  {
+    question: "Vad är självbestämmandeteorin, och vad har den med appen att göra?",
+    answer:
+      "Självbestämmandeteorin är en välkänd motivationsteori från psykologerna Edward Deci och Richard Ryan. Den beskriver tre behov som gör att vi vill göra något av egen vilja: autonomi (att själv få välja), kompetens (att känna att man klarar det) och samhörighet (att känna sig sedd). I ProvKlura väljer eleven själv vilket test hen tränar på. Eleven ser vad hen redan kan och jämförs bara med sig själv, aldrig med andra. Det finns inga topplistor, och klara test och tid finns kvar även om eleven missar en dag. Föräldern ser framstegen och kan svara när eleven ber om ett nytt test. Teorin bevisar däremot inte att en viss funktion, till exempel svit eller medaljer, får just ditt barn att plugga mer. Det är antaganden som vi testar och följer upp, och vi mäter både om eleverna kommer tillbaka och om de faktiskt lär sig.",
+    source: { label: "Self-Determination Theory, selfdeterminationtheory.org", href: "https://selfdeterminationtheory.org" },
   },
   {
     question: "Hittar AI:n bara på frågor, eller kan jag lita på dem?",
@@ -73,7 +90,22 @@ function FAQRow({ item }: { item: FAQItem }) {
         </span>
       </button>
       {open && (
-        <p className="mt-3 text-sm leading-relaxed text-navy/70">{item.answer}</p>
+        <>
+          <p className="mt-3 text-sm leading-relaxed text-navy/70">{item.answer}</p>
+          {item.source && (
+            <p className="mt-2 text-xs text-navy/50">
+              Källa:{" "}
+              <a
+                href={item.source.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-ocean underline"
+              >
+                {item.source.label}
+              </a>
+            </p>
+          )}
+        </>
       )}
     </div>
   );
