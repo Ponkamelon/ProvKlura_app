@@ -6,7 +6,8 @@ type Client = ReturnType<typeof import("@/lib/supabase/server").createClient>;
  */
 export type Feature = "fortsatt" | "steg1";
 
-const RELEASED: Feature[] = [];
+// Släppt för alla 23 okt 2026 (Pontus beslut, i stället för att vänta ut nulägesmätningen).
+const RELEASED: Feature[] = ["fortsatt", "steg1"];
 
 export async function hasFeature(supabase: Client, studentId: string, feature: Feature): Promise<boolean> {
   if (RELEASED.includes(feature)) return true;
