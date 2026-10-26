@@ -7,18 +7,21 @@ export type StudentQuizSet = {
   subject: string | null;
   isOfficial: boolean;
   examDate: string | null;
+  /** Provområdet (knowledge_points.area); null = hela testet. */
+  examAreas: string[] | null;
   assignedAt: string;
 };
 
 export async function getStudentQuizSets(supabase: Client, studentId: string): Promise<StudentQuizSet[]> {
   const { data } = await supabase
     .from("assignments")
-    .select("study_set_id, exam_date, assigned_at, study_sets(id, title, status, set_type, is_official, exam_date, chapters(subjects(name)))")
+    .select("study_set_id, exam_date, exam_areas, assigned_at, study_sets(id, title, status, set_type, is_official, exam_date, chapters(subjects(name)))")
     .eq("student_id", studentId);
 
   type Row = {
     study_set_id: string;
     exam_date: string | null;
+    exam_areas: string[] | null;
     assigned_at: string;
     study_sets: {
       id: string;
@@ -43,6 +46,7 @@ export async function getStudentQuizSets(supabase: Client, studentId: string): P
       subject: s.chapters?.subjects?.name?.replace(/^Nationell\s+/i, "") ?? null,
       isOfficial: s.is_official,
       examDate: r.exam_date ?? s.exam_date ?? null,
+      examAreas: r.exam_areas?.length ? r.exam_areas : null,
       assignedAt: r.assigned_at,
     });
   }

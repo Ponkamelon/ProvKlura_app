@@ -15,6 +15,17 @@ export type PointStatusRow = {
   status: PointStatus;
   answers_count: number;
   last_answered: string | null;
+  /** När punkten är aktuell för repetition enligt schemat (1, 3, 7, 14, 30 dagar). */
+  due_at?: string | null;
+  /** Steg i schemat, 0–4. */
+  review_step?: number | null;
+};
+
+export type DueOptions = {
+  /** Använd repetitionsschemat (steg 2). Annars förenklad startregel. */
+  schedule?: boolean;
+  /** Provet är inom 7 dagar: intervallen komprimeras till ett dygn (kravspec avsnitt 8). */
+  compress?: boolean;
 };
 
 export const STATUS_LABEL: Record<PointStatus, string> = {
@@ -49,13 +60,15 @@ export function countStatuses(rows: PointStatusRow[]): StatusCounts {
 }
 
 /**
- * Punkter som är aktuella för repetition: tränade, inte "Kan", och senast
- * besvarade för minst ett dygn sedan — eller "Kan" men inte tränade på en
- * vecka. Äldst först. Startregel; det fullständiga schemat (1, 3, 7, 14,
- * 30 dagar) kommer i steg 3.
+ * Är punkten aktuell för repetition? Med schemat (steg 2) avgör due_at:
+ * 1, 3, 7, 14, 30 dagar, där fel ger återbesök nästa dag. Är provet inom
+ * sju dagar komprimeras intervallen till ett dygn. Utan schema gäller
+ * startregeln: ett dygn, eller en vecka för punkter eleven kan.
  */
-export function isDueForRepetition(row: PointStatusRow, now = Date.now()): boolean {
+export function isDueForRepetition(row: PointStatusRow, now = Date.now(), options: DueOptions = {}): boolean {
   if (row.status === "inte_tranat" || !row.last_answered) return false;
   const ageDays = (now - Date.parse(row.last_answered)) / 86400000;
+  if (options.compress) return ageDays >= 1;
+  if (options.schedule && row.due_at) return Date.parse(row.due_at) <= now;
   return row.status === "kan" ? ageDays >= 7 : ageDays >= 1;
 }

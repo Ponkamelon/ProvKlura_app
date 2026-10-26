@@ -13,6 +13,8 @@ import { hasFeature } from "@/lib/features";
 import { getPointStatuses } from "@/lib/knowledge/status";
 import { selectShortRound } from "@/lib/quiz/shortRound";
 import { loadResumedAttempt } from "@/lib/quiz/loadResumed";
+import { compressIntervals, examPhase } from "@/lib/quiz/examPhase";
+import { stockholmTodayIso } from "@/lib/nutid/week";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -105,9 +107,12 @@ export default async function QuizPage({
   let mode: "test" | "short" | "mistakes" = searchParams.mode === "mistakes" ? "mistakes" : "test";
 
   if (stepOne && searchParams.runda === "kort" && searchParams.mode !== "mistakes") {
-    // Kort runda: fem frågor enligt 2+2+1 (kravspec avsnitt 5).
+    // Kort runda: fem frågor enligt 2+2+1 (kravspec avsnitt 5). Med steg 2
+    // styr provdatum och provområde fördelningen (avsnitt 9) och
+    // repetitionsschemat avgör vad som är aktuellt (avsnitt 8).
     mode = "short";
-    const [{ data: kpRows }, points, { data: lastRound }] = await Promise.all([
+    const stepTwo = await hasFeature(supabase, profile.id, "steg2");
+    const [{ data: kpRows }, points, { data: lastRound }, { data: assignment }] = await Promise.all([
       supabase.from("questions").select("id, knowledge_point_id").in("id", allQuestions.map((q) => q.id)),
       getPointStatuses(supabase, [params.studySetId]),
       supabase
@@ -119,7 +124,16 @@ export default async function QuizPage({
         .order("started_at", { ascending: false })
         .limit(1)
         .maybeSingle(),
+      supabase
+        .from("assignments")
+        .select("exam_date, exam_areas")
+        .eq("student_id", profile.id)
+        .eq("study_set_id", params.studySetId)
+        .limit(1)
+        .maybeSingle(),
     ]);
+    const today = stockholmTodayIso();
+    const examDate = (assignment?.exam_date as string | null) ?? null;
     const pointByQuestion = new Map<string, string | null>(
       (kpRows ?? []).map((r) => [r.id as string, (r.knowledge_point_id as string | null) ?? null]),
     );
@@ -131,6 +145,16 @@ export default async function QuizPage({
       })),
       points,
       ((lastRound?.question_ids ?? []) as string[]),
+      undefined,
+      undefined,
+      stepTwo
+        ? {
+            phase: examPhase(examDate, today),
+            examAreas: (assignment?.exam_areas as string[] | null) ?? null,
+            schedule: true,
+            compress: compressIntervals(examDate, today),
+          }
+        : {},
     );
     const byId = new Map(allQuestions.map((q) => [q.id, q]));
     pool = ids.map((id) => byId.get(id)).filter((q): q is QuestionRow => !!q);

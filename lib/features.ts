@@ -4,7 +4,7 @@ type Client = ReturnType<typeof import("@/lib/supabase/server").createClient>;
  * Funktioner som slås på i förväg för enskilda elever (feature_previews),
  * medan nuläget mäts. När en funktion släpps för alla läggs den i RELEASED.
  */
-export type Feature = "fortsatt" | "steg1";
+export type Feature = "fortsatt" | "steg1" | "steg2";
 
 // Släppt för alla 23 okt 2026 (Pontus beslut, i stället för att vänta ut nulägesmätningen).
 const RELEASED: Feature[] = ["fortsatt", "steg1"];

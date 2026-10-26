@@ -15,7 +15,7 @@ import { ResumeCard } from "@/components/ResumeCard";
 import { TestCard } from "@/components/TestCard";
 import { getStudentQuizSets } from "@/lib/quiz/studentSets";
 import { getPointStatuses, countStatuses, type PointStatusRow } from "@/lib/knowledge/status";
-import { duePoints, MIXED_ROUND_SIZE } from "@/lib/quiz/mixedRound";
+import { duePoints, MIXED_ROUND_SIZE, RESTART_AFTER_DAYS } from "@/lib/quiz/mixedRound";
 import { compareByExam, daysUntil, examLabel } from "@/lib/quiz/examDate";
 
 /** Högst så här många testkort visas direkt (kravspec avsnitt 2). */
@@ -148,7 +148,26 @@ export default async function ElevDashboard({ searchParams }: { searchParams: { 
     const points = await getPointStatuses(supabase, sets.map((s) => s.id));
     const pointsBySet = new Map<string, PointStatusRow[]>();
     for (const p of points) pointsBySet.set(p.study_set_id, [...(pointsBySet.get(p.study_set_id) ?? []), p]);
-    const dueCount = Math.min(duePoints(points).length, MIXED_ROUND_SIZE);
+    // Steg 2: repetitionsschemat avgör vad som är aktuellt, och test med prov
+    // inom sju dagar prioriteras. Kön visas aldrig som skuld — högst fem.
+    const stepTwo = await hasFeature(supabase, profile.id, "steg2");
+    const examSoon = new Map<string, string[] | null>(
+      sets
+        .filter((s) => s.examDate && daysUntil(s.examDate, today) >= 0 && daysUntil(s.examDate, today) <= 7)
+        .map((s): [string, string[] | null] => [s.id, s.examAreas]),
+    );
+    const dueCount = Math.min(
+      duePoints(points, Date.now(), stepTwo ? { schedule: true, examSoon } : {}).length,
+      MIXED_ROUND_SIZE,
+    );
+    // Återstart (kravspec avsnitt 8): har eleven tränat förut men inte varit
+    // aktiv på tio dagar erbjuds en lätt runda i stället för en kö.
+    const lastActive = overview.days[0];
+    const restart =
+      stepTwo &&
+      !!lastActive &&
+      daysUntil(today, lastActive) >= RESTART_AFTER_DAYS &&
+      points.some((p) => p.status !== "inte_tranat");
     const showAll = searchParams.alla === "1";
     const shown = showAll ? sets : sets.slice(0, CARDS_SHOWN);
     const updatedIds = await getUpdatedStudySetIds(supabase, profile.id, sets.map((s) => s.id));
@@ -181,6 +200,7 @@ export default async function ElevDashboard({ searchParams }: { searchParams: { 
                   examSoon={!!s.examDate && daysUntil(s.examDate, today) >= 0 && daysUntil(s.examDate, today) <= 7}
                   counts={countStatuses(pointsBySet.get(s.id) ?? [])}
                   updated={updatedIds.has(s.id)}
+                  examToday={stepTwo && !!s.examDate && daysUntil(s.examDate, today) === 0}
                 />
               ))}
             </div>
@@ -200,7 +220,17 @@ export default async function ElevDashboard({ searchParams }: { searchParams: { 
           )}
         </section>
 
-        {dueCount > 0 && (
+        {restart ? (
+          <Link
+            href="/elev/repetera?aterstart=1"
+            className="mt-4 flex items-center justify-between gap-3 rounded-xl border border-sand-deep bg-white/50 px-4 py-3 text-sm text-navy transition-colors hover:bg-white/80"
+          >
+            <span>
+              <span className="font-medium">Välkommen tillbaka!</span> Kom igång med en lätt runda · 5 frågor
+            </span>
+            <Icon name="nasta" size={16} className="text-navy/40" />
+          </Link>
+        ) : dueCount > 0 && (
           <Link
             href="/elev/repetera"
             className="mt-4 flex items-center justify-between gap-3 rounded-xl border border-sand-deep bg-white/50 px-4 py-3 text-sm text-navy transition-colors hover:bg-white/80"

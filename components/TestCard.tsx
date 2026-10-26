@@ -22,6 +22,7 @@ export function TestCard({
   examSoon,
   counts,
   updated,
+  examToday = false,
 }: {
   id: string;
   title: string;
@@ -30,6 +31,8 @@ export function TestCard({
   examSoon: boolean;
   counts: StatusCounts;
   updated: boolean;
+  /** Provdagen (steg 2): den korta rundan är bara repetition. */
+  examToday?: boolean;
 }) {
   const legend = STATUS_ORDER.filter((s) => counts[s] > 0)
     .map((s) => `${STATUS_LABEL[s]} ${counts[s]}`)
@@ -70,7 +73,7 @@ export function TestCard({
           href={`/elev/plugga/${id}/quiz?runda=kort&kalla=testkort`}
           className="btn-primary justify-center px-3 py-2 text-sm"
         >
-          Kort runda · 3 min
+          {examToday ? "Kort repetition · 3 min" : "Kort runda · 3 min"}
         </Link>
         <Link
           href={`/elev/plugga/${id}/quiz?length=alla&kalla=testkort`}

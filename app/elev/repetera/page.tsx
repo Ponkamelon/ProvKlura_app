@@ -5,7 +5,9 @@ import { QuizRunner } from "@/components/QuizRunner";
 import { hasFeature } from "@/lib/features";
 import { getPointStatuses } from "@/lib/knowledge/status";
 import { getStudentQuizSets } from "@/lib/quiz/studentSets";
-import { selectMixedRound } from "@/lib/quiz/mixedRound";
+import { selectMixedRound, selectRestartRound } from "@/lib/quiz/mixedRound";
+import { daysUntil } from "@/lib/quiz/examDate";
+import { stockholmTodayIso } from "@/lib/nutid/week";
 import { shuffle, shuffleOptions } from "@/lib/quiz/selection";
 import { getVariantsForStudySet, type QuestionVariant } from "@/lib/quiz/variants";
 import { loadResumedAttempt } from "@/lib/quiz/loadResumed";
@@ -26,7 +28,7 @@ type QuestionRow = {
  * Repetera blandat (kravspec avsnitt 4): en kort runda med frågor från
  * flera av elevens test, om saker hen tränat och som är dags att fräscha upp.
  */
-export default async function RepeteraPage({ searchParams }: { searchParams: { fortsatt?: string } }) {
+export default async function RepeteraPage({ searchParams }: { searchParams: { fortsatt?: string; aterstart?: string } }) {
   const profile = await requireProfile("student");
   const supabase = createClient();
   if (!(await hasFeature(supabase, profile.id, "steg1"))) redirect("/elev");
@@ -76,10 +78,20 @@ export default async function RepeteraPage({ searchParams }: { searchParams: { f
     (progress ?? []).map((p) => [p.question_id as string, (p.last_answered as string | null) ?? null]),
   );
 
-  const ids = selectMixedRound(
-    points,
-    questions.map((q) => ({ ...q, last_answered: lastAnswered.get(q.id) ?? null })),
+  // Steg 2: schemat avgör, provområden med prov inom sju dagar först.
+  // Återstartsrundan tar sådant eleven redan klarat, så omstarten känns lätt.
+  const stepTwo = await hasFeature(supabase, profile.id, "steg2");
+  const today = stockholmTodayIso();
+  const examSoon = new Map<string, string[] | null>(
+    sets
+      .filter((s) => s.examDate && daysUntil(s.examDate, today) >= 0 && daysUntil(s.examDate, today) <= 7)
+      .map((s): [string, string[] | null] => [s.id, s.examAreas]),
   );
+  const candidates = questions.map((q) => ({ ...q, last_answered: lastAnswered.get(q.id) ?? null }));
+  const ids =
+    stepTwo && searchParams.aterstart === "1"
+      ? selectRestartRound(points, candidates)
+      : selectMixedRound(points, candidates, undefined, undefined, stepTwo ? { schedule: true, examSoon } : {});
   if (!ids.length) redirect("/elev");
 
   const byId = new Map(questions.map((q) => [q.id, q]));
