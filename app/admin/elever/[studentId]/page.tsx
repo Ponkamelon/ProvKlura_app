@@ -5,13 +5,14 @@ import { createClient } from "@/lib/supabase/server";
 import { NutidProgressView } from "@/components/NutidProgressView";
 import { computeProgress, type AttemptRow } from "@/lib/nutid/progress";
 import { Icon } from "@/components/Icon";
+import { StudentAssignments, type AssignmentRow } from "@/components/StudentAssignments";
 
 export default async function StudentDetailPage({
   params,
 }: {
   params: { studentId: string };
 }) {
-  await requireProfile("admin");
+  const profile = await requireProfile("admin");
   const supabase = createClient();
 
   const { data: student } = await supabase
@@ -25,18 +26,67 @@ export default async function StudentDetailPage({
     return <p className="text-navy/70">Hittade inte eleven.</p>;
   }
 
-  const { data: assignments } = await supabase
-    .from("assignments")
-    .select("study_set_id")
-    .eq("student_id", student.id);
+  const [{ data: assignments }, { data: ownSets }, { data: trainedRows }] = await Promise.all([
+    supabase
+      .from("assignments")
+      .select("study_set_id, exam_date, assigned_by, assigned_at")
+      .eq("student_id", student.id)
+      .order("assigned_at", { ascending: false }),
+    // Förälderns egna publicerade test, så de kan läggas till härifrån.
+    supabase
+      .from("study_sets")
+      .select("id")
+      .eq("admin_id", profile.id)
+      .eq("status", "published"),
+    supabase
+      .from("attempts")
+      .select("study_set_id, started_at")
+      .eq("student_id", student.id)
+      .not("study_set_id", "is", null)
+      .order("started_at", { ascending: false })
+      .limit(1000),
+  ]);
 
-  const studySetIds = assignments?.map((a) => a.study_set_id) ?? [];
+  const studySetIds = [
+    ...new Set([...(assignments ?? []).map((a) => a.study_set_id as string), ...(ownSets ?? []).map((s) => s.id as string)]),
+  ];
 
-  const { data: studySets } = studySetIds.length
-    ? await supabase.from("study_sets").select("id, title").in("id", studySetIds)
-    : { data: [] as { id: string; title: string }[] };
+  type SetRow = { id: string; title: string; is_official: boolean; chapters: { subjects: { name: string } | null } | null };
+  const { data: studySetData } = studySetIds.length
+    ? await supabase.from("study_sets").select("id, title, is_official, chapters(subjects(name))").in("id", studySetIds)
+    : { data: [] };
+  const studySets = (studySetData ?? []) as unknown as SetRow[];
 
-  const studySetTitleById = new Map((studySets ?? []).map((s) => [s.id, s.title]));
+  const studySetTitleById = new Map(studySets.map((s) => [s.id, s.title]));
+
+  const lastTrainedBySet = new Map<string, string>();
+  for (const t of trainedRows ?? []) {
+    if (!lastTrainedBySet.has(t.study_set_id as string)) lastTrainedBySet.set(t.study_set_id as string, t.started_at as string);
+  }
+  const setById = new Map(studySets.map((s) => [s.id, s]));
+  type AssignmentInfo = { study_set_id: string; exam_date: string | null; assigned_by: string | null };
+  const assignedById = new Map<string, AssignmentInfo>(
+    ((assignments ?? []) as AssignmentInfo[]).map((a) => [a.study_set_id, a]),
+  );
+  const toRow = (setId: string): AssignmentRow | null => {
+    const set = setById.get(setId);
+    if (!set) return null;
+    const a = assignedById.get(setId);
+    return {
+      setId,
+      title: set.title,
+      subject: (set.chapters?.subjects?.name ?? "Övrigt").replace(/^Nationell\s+/i, ""),
+      isOfficial: set.is_official,
+      assigned: !!a,
+      locked: !!a && a.assigned_by !== profile.id && !(ownSets ?? []).some((s) => s.id === setId),
+      examDate: (a?.exam_date as string | null) ?? null,
+      lastTrained: lastTrainedBySet.get(setId) ?? null,
+    };
+  };
+  const assignmentRows = [
+    ...(assignments ?? []).map((a) => toRow(a.study_set_id as string)),
+    ...(ownSets ?? []).filter((s) => !assignedById.has(s.id as string)).map((s) => toRow(s.id as string)),
+  ].filter((r): r is AssignmentRow => !!r);
 
   const { data: attempts } = await supabase
     .from("attempts")
@@ -116,6 +166,12 @@ export default async function StudentDetailPage({
           </p>
         </div>
       </div>
+
+      <StudentAssignments
+        studentId={student.id}
+        firstName={(student.display_name ?? "eleven").split(" ")[0]}
+        rows={assignmentRows}
+      />
 
       <section className="nutid-card mt-10 p-5">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
