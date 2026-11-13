@@ -1,5 +1,6 @@
 "use server";
 
+import { answerMatches } from "@/lib/quiz/answerMatch";
 import { revalidatePath } from "next/cache";
 import { requireProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
@@ -98,14 +99,13 @@ export async function submitAnswerAction(params: {
   const variant = await getVariantForQuestion(supabase, params.questionId);
 
   const skipped = params.skipped === true;
-  const normalizedSelected = params.selectedAnswer.trim().toLowerCase();
   const asList = (v: unknown) => (Array.isArray(v) ? (v as string[]) : []);
   const acceptedList = [
     ...(variant ? [variant.correct_answer, ...asList(variant.accepted_answers)] : []),
     question.correct_answer,
     ...asList(question.accepted_answers),
-  ].map((a) => a.trim().toLowerCase());
-  const correct = skipped ? null : acceptedList.includes(normalizedSelected);
+  ].filter((a): a is string => typeof a === "string");
+  const correct = skipped ? null : answerMatches(params.selectedAnswer, acceptedList);
   const responseSeconds = Math.max(0, Math.round(params.responseTimeMs / 1000));
 
   await supabase.from("answers").upsert(
